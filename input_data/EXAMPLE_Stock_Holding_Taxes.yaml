@@ -1,0 +1,21 @@
+---
+name: Stock holding taxes
+account: Local Bank
+group: Stocks
+data:
+  - { date: 2018-10, cash: 6.09 }
+  - { date: 2019-01, cash: 6.09 }
+  - { date: 2019-04, cash: 6.09 }
+  - { date: 2019-07, cash: 6.09 }
+  - { date: 2019-10, cash: 6.09 }
+  - { date: 2020-01, cash: 6.09 }
+  - { date: 2020-02, cash: 2.01 }
+  - { date: 2020-03, cash: 2.1 }
+  - { date: 2020-04, cash: 2.1 }
+  - { date: 2020-05, cash: 2.1 }
+  - { date: 2020-06, cash: 2.1 }
+  - { date: 2020-07, cash: 2.1 }
+  - { date: 2020-08, cash: 2.1 }
+  - { date: 2020-09, cash: 2.1 }
+  - { date: 2020-10, cash: 2.1 }
+  - { date: 2020-11, cash: 2.1 }

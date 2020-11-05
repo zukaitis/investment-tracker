@@ -137,6 +137,7 @@ def process_data(input_data : list) -> pd.DataFrame:
     data['cash_invested'] = data['cash'].cumsum()
     data['return_received'] = data['return'].cumsum()
     data['profit'] = data['value'] - data['cash_invested'] + data['return_received']
+    data['cash_invested'] = np.where(data['cash_invested'] < 0, 0, data['cash_invested'])
     data['relative_profit'] = (data['profit'] / data['cash_invested']) * 100
 
     return data
@@ -284,9 +285,16 @@ def plot_historical_relative_profit(dataframe: pd.DataFrame) -> go.Figure:
 def plot_historical_asset_data(data: pd.DataFrame) -> go.Figure:
     fig = go.Figure()
 
-    data['value_and_return'] = data['value'] + data['return_received']
+    data['value_and_return'] = data['cash_invested'] + data['profit']
+    data['red_fill'] = np.where(
+        data['cash_invested'] > data['return_received'],
+        data['cash_invested'], data['return_received'])
 
-    fig.add_trace(go.Scatter(x=data['date'], y=data['cash_invested'], fill='tozeroy', mode= 'none', fillcolor='rgba(255,0,0,0.7)',
+    fig.add_trace(go.Scatter(x=data['date'], y=data['red_fill'],
+        fill='tozeroy', mode='none', fillcolor='rgba(255,0,0,0.7)',
+        hoverinfo='skip'))
+    fig.add_trace(go.Scatter(x=data['date'], y=data['cash_invested'],
+        mode='none',
         hovertemplate = "Cash invested: %{y:.2f}€<extra></extra>"))
     data['f_profit'] = data['profit'].map('{:,.2f}€ / '.format)
     data['f_relative_profit'] = data['relative_profit'].map('{:,.2f}%'.format)
@@ -304,18 +312,18 @@ def plot_historical_asset_data(data: pd.DataFrame) -> go.Figure:
                 "Return received: %{y:.2f}€<extra></extra>"))
         blue_fill_mode = 'tonexty'
 
-    blue_fill = data[['date', 'cash_invested', 'value_and_return']]
+    blue_fill = data[['date', 'red_fill', 'value_and_return']]
     blue_fill.index *= 2
-    blue_fill['y'] = np.where(blue_fill['cash_invested'] < blue_fill['value_and_return'], blue_fill['cash_invested'], data['value_and_return'])
-    blue_fill['profitable'] = (blue_fill['y'] == blue_fill['cash_invested'])
+    blue_fill['y'] = np.where(blue_fill['red_fill'] < blue_fill['value_and_return'], blue_fill['red_fill'], data['value_and_return'])
+    blue_fill['profitable'] = (blue_fill['y'] == blue_fill['red_fill'])
     mask = blue_fill.iloc[:-1]['profitable'] ^ blue_fill['profitable'].shift(-1)
     intermediate_values = blue_fill[mask]
     intermediate_values.index += 1
     intermediate_values['y'] = np.nan
     blue_fill = blue_fill.append(intermediate_values).sort_index().reset_index(drop=True)
-    blue_fill['slope'] = abs(blue_fill['value_and_return'] - blue_fill['cash_invested']) / (abs(blue_fill['value_and_return'] - blue_fill['cash_invested']) + abs(blue_fill.shift(-1)['value_and_return'] - blue_fill.shift(-1)['cash_invested']))
+    blue_fill['slope'] = abs(blue_fill['value_and_return'] - blue_fill['red_fill']) / (abs(blue_fill['value_and_return'] - blue_fill['red_fill']) + abs(blue_fill.shift(-1)['value_and_return'] - blue_fill.shift(-1)['red_fill']))
     blue_fill['date'] = np.where(pd.isna(blue_fill['y']), (blue_fill.shift(-1)['date'] - blue_fill['date']) * blue_fill['slope'] + blue_fill['date'], blue_fill['date'])
-    blue_fill['y'] = np.where(pd.isna(blue_fill['y']), (blue_fill.shift(-1)['cash_invested'] - blue_fill['cash_invested']) * blue_fill['slope'] + blue_fill['cash_invested'], blue_fill['y'])
+    blue_fill['y'] = np.where(pd.isna(blue_fill['y']), (blue_fill.shift(-1)['red_fill'] - blue_fill['red_fill']) * blue_fill['slope'] + blue_fill['red_fill'], blue_fill['y'])
     fig.add_trace(go.Scatter(x=blue_fill['date'], y=blue_fill['y'], fill=blue_fill_mode, mode='none', fillcolor='rgba(0,0,255,0.5)',
         hoverinfo='skip'))
 
@@ -341,6 +349,7 @@ def plot_yearly_asset_data(data: pd.DataFrame) -> go.Figure:
     yearly_data['value_change'] = yearly_data['value'] - yearly_data['cash_invested']
     yearly_data.loc[yearly_data.index[0], 'value_change'] = 0
     yearly_data['value_change'] = yearly_data['value_change'].diff()
+    yearly_data.loc[yearly_data.index[0], 'return_received'] = 0
     yearly_data['return_received'] = yearly_data['return_received'].diff()
     if yearly_data.index[-1] == yearly_data.index[-2]:
         # if two last rows are the same, drop one of them
@@ -512,7 +521,7 @@ if __name__ == '__main__':
     append_overall_data_tabs(d)
     append_asset_data_tabs(d)
 
-    d += raw('<p class="link">Report generated on ' + datetime.date.today().strftime('%Y-%m-%d') + ', using open source script: <a href="https://github.com/zukaitis/investment_tracker/">Investment Tracker</a></p>')
+    d += raw('<p class="link">Report generated on ' + datetime.date.today().strftime('%Y-%m-%d') + ', using open source script: <a href="https://github.com/zukaitis/investment-tracker/">Investment Tracker</a></p>')
 
     with open('report.html', 'w') as f:
         print(d, file=f)
