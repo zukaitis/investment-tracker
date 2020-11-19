@@ -1,0 +1,42 @@
+---
+name: Ethereum
+symbol: ETH
+group: Cryptocurrency
+data:
+  - { date: 2020-11, price: 331.06}
+  - { date: 2020-10, price: 307.1}
+  - { date: 2020-09, price: 364.29}
+  - { date: 2020-08, price: 293.58}
+  - { date: 2020-07, price: 201.29}
+  - { date: 2020-06, price: 207.66}
+  - { date: 2020-05, price: 189.97}
+  - { date: 2020-04, price: 121.17}
+  - { date: 2020-03, price: 199.27}
+  - { date: 2020-02, price: 162.34}
+  - { date: 2020-01, price: 115.54}
+  - { date: 2019-12, price: 138.4}
+  - { date: 2019-11, price: 164.74}
+  - { date: 2019-10, price: 165.33}
+  - { date: 2019-09, price: 156.63}
+  - { date: 2019-08, price: 197.41}
+  - { date: 2019-07, price: 255.48}
+  - { date: 2019-06, price: 239.81}
+  - { date: 2019-05, price: 144.61}
+  - { date: 2019-04, price: 126.05}
+  - { date: 2019-03, price: 120.32}
+  - { date: 2019-02, price: 93.6}
+  - { date: 2019-01, price: 116.1}
+  - { date: 2018-12, price: 100.19}
+  - { date: 2018-11, price: 174.58}
+  - { date: 2018-10, price: 200.95}
+  - { date: 2018-09, price: 244.41}
+  - { date: 2018-08, price: 371.24}
+  - { date: 2018-07, price: 389.66}
+  - { date: 2018-06, price: 495.06}
+  - { date: 2018-05, price: 555.07}
+  - { date: 2018-04, price: 322.42}
+  - { date: 2018-03, price: 702.22}
+  - { date: 2018-02, price: 901.55}
+  - { date: 2018-01, price: 629.69}
+  - { date: 2017-12, price: 374.19, cash: +450, amount: 2}
+  - { date: 2017-11, price: 262.43, cash: +300, amount: 1}

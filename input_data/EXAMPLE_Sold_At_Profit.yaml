@@ -21,6 +21,7 @@ data:
   - { date: 2019-10, price: 1.175 }
   - { date: 2019-11, price: 1.21 }
   - { date: 2019-12, price: 1.265 }
+  - { date: 2019-12, price: 1.275 } # duplicate value
   - { date: 2020-01, price: 1.285 }
   - { date: 2020-02, price: 1.33 }
   - { date: 2020-03, price: 1.27 }

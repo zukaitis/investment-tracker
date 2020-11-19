@@ -12,6 +12,7 @@ import dominate
 import dominate.tags as dt
 from dominate.util import raw
 from dataclasses import dataclass
+import warnings
 
 cyan = px.colors.qualitative.Plotly[5]
 
@@ -104,7 +105,12 @@ def process_data(input_data : list) -> pd.DataFrame:
     data = pd.DataFrame(input_data)
 
     data['date'] = pd.to_datetime(data['date'])
-    data.drop_duplicates(subset=['date'])
+    if data.duplicated(subset='date').any():
+        warnings.warn('There are duplicate dates in "{}" dataset:\n{}'.format(
+            data.loc[data.index[0], 'name'],
+            data.loc[data.duplicated(subset='date'),'date']))
+        data.drop_duplicates(subset=['date'], inplace=True)
+    data.sort_values(by=['date'], inplace=True)
 
     data['cash'] = pd.to_numeric(data['cash'])
     data['cash'] = data['cash'].fillna(0.0)
@@ -139,20 +145,31 @@ def process_data(input_data : list) -> pd.DataFrame:
     data['profit'] = data['value'] - data['cash_invested'] + data['return_received']
     data['cash_invested'] = np.where(data['cash_invested'] < 0, 0, data['cash_invested'])
     data['relative_profit'] = (data['profit'] / data['cash_invested']) * 100
+    data['relative_profit'] = np.where(np.isinf(data['relative_profit']),
+        (data['profit'] / max(data['cash_invested']) * 100), data['relative_profit'])
 
     return data
 
-def plot_sunburst(dataframe: pd.DataFrame, values: str, label_text: list) -> go.Sunburst:
+def plot_sunburst(input: pd.DataFrame,
+        values: str, label_text) -> go.Sunburst:
+    dataframe = input.copy()
     dataframe = dataframe.loc[dataframe[values] != 0]  # filter 0 values
     dataframe['rootnode'] = ''
-    dataframe['sign'] = np.where(dataframe[values] > 0, label_text[0], label_text[1])
+    if type(label_text) is str:
+        label_text = [label_text, '']
+    dataframe['sign'] = np.where(dataframe[values] > 0,
+        label_text[0], label_text[1])
+
+    dataframe['account'] = np.where(dataframe['account'] == ' ',
+        dataframe['group'], dataframe['account'])
 
     # Manipulating names in order to separate positive and negative values
-    dataframe['account'] = np.where(dataframe['account'] == ' ', dataframe['group'], dataframe['account'])
-    dataframe['account'] = np.where(dataframe[values] < 0, dataframe['account'] + ' ', dataframe['account'])
-    dataframe['group'] = np.where(dataframe[values] < 0, dataframe['group'] + ' ', dataframe['group'])
+    dataframe['account'] = np.where(dataframe[values] < 0,
+        dataframe['account'] + ' ', dataframe['account'])
+    dataframe['group'] = np.where(dataframe[values] < 0,
+        dataframe['group'] + ' ', dataframe['group'])
 
-    data = dataframe[['name', 'account', values, 'sign', 'color']]
+    data = dataframe[['name', 'account', values, 'sign', 'color']].copy()
     data.columns = ['label', 'parent', 'value', 'sign', 'color']
     data['value'] = abs(data['value'])
 
@@ -168,22 +185,25 @@ def plot_sunburst(dataframe: pd.DataFrame, values: str, label_text: list) -> go.
         d[values] = abs(d[values])
         d = d[[path[i], path[i-1], values, 'sign', 'color']]
         d.columns = ['label', 'parent', 'value', 'sign', 'color']
-        d = d.drop(d[d.label == d.parent].index)  # remove rows, where label matches parent
+        # remove rows, where label matches parent
+        d = d.drop(d[d.label == d.parent].index)
         data = data.append(d)
 
     # Set colors for positive and negative sign labels if they exist
-    data['color'] = np.where(data['label'] == label_text[0], 'rgb(0, 255, 0)', data['color'])
-    data['color'] = np.where(data['label'] == label_text[1], 'rgb(255, 0, 0)', data['color'])
+    data['color'] = np.where(data['label'] == label_text[0],
+        'rgb(0, 255, 0)', data['color'])
+    data['color'] = np.where(data['label'] == label_text[1],
+        'rgb(255, 0, 0)', data['color'])
 
-    return go.Sunburst(labels=data['label'], parents=data['parent'], values=data['value'], customdata=data['sign'], marker=dict(colors=data['color']),
-        branchvalues='total', hovertemplate =
-            "<b>%{label}</b><br>" +
-            "%{customdata}: %{value:.2f}€<extra></extra>")
+    return go.Sunburst(labels=data['label'], parents=data['parent'],
+        values=data['value'], customdata=data['sign'],
+        marker=dict(colors=data['color']), branchvalues='total', hovertemplate=
+            '<b>%{label}</b><br>%{customdata}: %{value:.2f}€<extra></extra>')
 
-def plot_relative_profit_sunburst(dataframe: pd.DataFrame) -> go.Sunburst:
+def plot_relative_profit_sunburst(input: pd.DataFrame) -> go.Sunburst:
+    dataframe = input.copy()
     dataframe['rootnode'] = ''
-    
-    dataframe['relative_profit'] = (dataframe['profit'] / dataframe['cash_invested']) * 100
+
     dataframe = dataframe.loc[dataframe['relative_profit'] != 0]  # filter 0 values
     dataframe = dataframe.loc[dataframe['relative_profit'] != -100]  # filter -100 values (taxes)
     dataframe['sign'] = np.where(dataframe['relative_profit'] > 0, 'Profit', 'Loss')
@@ -195,7 +215,7 @@ def plot_relative_profit_sunburst(dataframe: pd.DataFrame) -> go.Sunburst:
 
     dataframe['relative_profit_sum'] = dataframe['relative_profit']
 
-    data = dataframe[['name', 'account', 'relative_profit', 'relative_profit_sum', 'sign', 'color']]
+    data = dataframe[['name', 'account', 'relative_profit', 'relative_profit_sum', 'sign', 'color']].copy()
     data.columns = ['label', 'parent', 'relative_profit', 'relative_profit_sum', 'sign', 'color']
     data['relative_profit_sum'] = abs(data['relative_profit_sum'])
 
@@ -238,11 +258,11 @@ def plot_historical_data(dataframe: pd.DataFrame, values: str, label_text: str) 
     for a in asset_properties.index:
         if not ((value_by_date[a].nunique() == 1) and (value_by_date[a].sum() == 0)):
             # only plot traces with at least one non-zero value
-            fig.add_trace(go.Bar(x=value_by_date.index, y=value_by_date[a], name=a, customdata=np.dstack(a), marker=dict(color=asset_properties.loc[a,'color']),
+            fig.add_trace(go.Bar(x=value_by_date.index, y=value_by_date[a], name=a, customdata=np.dstack(a), marker=dict(color=asset_properties.loc[a, 'color']),
                 hovertemplate =
-                    "<b>%{customdata[0]}</b><br>" +
+                    "<b>%{name}</b><br>" +
                     "%{x|%B %Y}<br>" + label_text +
-                    " %{y:.2f}€<extra></extra>"))
+                    ": %{y:.2f}€<extra></extra>"))
 
     fig.update_layout(barmode='relative')
     six_months = [value_by_date.index[-1] - datetime.timedelta(days=(365/2 - 15)), value_by_date.index[-1] + datetime.timedelta(days=15)]
@@ -253,7 +273,6 @@ def plot_historical_data(dataframe: pd.DataFrame, values: str, label_text: str) 
     return fig
 
 def plot_historical_relative_profit(dataframe: pd.DataFrame) -> go.Figure:
-    dataframe['relative_profit'] = (dataframe['profit'] / dataframe['cash_invested']) * 100
     value_by_date = dataframe.pivot(index='date', columns='name', values='relative_profit')
     value_by_date = value_by_date.drop(value_by_date.columns[value_by_date.max() == -100], axis=1)
 
@@ -282,7 +301,8 @@ def plot_historical_relative_profit(dataframe: pd.DataFrame) -> go.Figure:
 
     return fig
 
-def plot_historical_asset_data(data: pd.DataFrame) -> go.Figure:
+def plot_historical_asset_data(input: pd.DataFrame) -> go.Figure:
+    data = input.copy()
     fig = go.Figure()
 
     data['value_and_return'] = data['cash_invested'] + data['profit']
@@ -312,12 +332,12 @@ def plot_historical_asset_data(data: pd.DataFrame) -> go.Figure:
                 "Return received: %{y:.2f}€<extra></extra>"))
         blue_fill_mode = 'tonexty'
 
-    blue_fill = data[['date', 'red_fill', 'value_and_return']]
+    blue_fill = data[['date', 'red_fill', 'value_and_return']].copy()
     blue_fill.index *= 2
     blue_fill['y'] = np.where(blue_fill['red_fill'] < blue_fill['value_and_return'], blue_fill['red_fill'], data['value_and_return'])
     blue_fill['profitable'] = (blue_fill['y'] == blue_fill['red_fill'])
     mask = blue_fill.iloc[:-1]['profitable'] ^ blue_fill['profitable'].shift(-1)
-    intermediate_values = blue_fill[mask]
+    intermediate_values = blue_fill[mask].copy()
     intermediate_values.index += 1
     intermediate_values['y'] = np.nan
     blue_fill = blue_fill.append(intermediate_values).sort_index().reset_index(drop=True)
@@ -334,7 +354,7 @@ def plot_historical_asset_data(data: pd.DataFrame) -> go.Figure:
     fig.update_layout(hovermode='x', showlegend=False)
     fig.update_layout(hoverlabel=dict(bgcolor='white'))
     configure_historical_dataview(fig)
-    one_year = [data['date'].iloc[-1] - datetime.timedelta(days=365), data['date'].iloc[-1]]
+    one_year = [latest_date - datetime.timedelta(days=365), latest_date]
     fig.update_xaxes(range=one_year, rangeslider=dict(visible=True))
     fig.update_yaxes(ticksuffix='€')
     return fig
@@ -346,7 +366,7 @@ def plot_yearly_asset_data(data: pd.DataFrame) -> go.Figure:
     yearly_data = yearly_data.append(data.iloc[-1])
     yearly_data['date'] = yearly_data['date'].dt.year - 1
     
-    yearly_data['value_change'] = yearly_data['value'] - yearly_data['cash_invested']
+    yearly_data['value_change'] = yearly_data['profit'] - yearly_data['return_received']
     yearly_data.loc[yearly_data.index[0], 'value_change'] = 0
     yearly_data['value_change'] = yearly_data['value_change'].diff()
     yearly_data.loc[yearly_data.index[0], 'return_received'] = 0
@@ -377,7 +397,6 @@ def plot_yearly_asset_data(data: pd.DataFrame) -> go.Figure:
 
     return fig
 
-
 def configure_historical_dataview(figure: go.Figure):
     figure.update_xaxes(type='date', rangeslider_visible=False,
         rangeselector=dict( x=0, buttons=list([
@@ -389,7 +408,7 @@ def configure_historical_dataview(figure: go.Figure):
     figure.update_layout(margin=dict(l=10, r=10, t=20, b=10))
     figure.update_layout(xaxis=dict(title=dict(text='')), yaxis=dict(title=dict(text='')))
 
-def append_figures(statistic: str, label_text: list) -> str:
+def append_figures(statistic: str, label_text) -> str:
 
     if statistic == 'relative_profit':
         sunburst = go.Figure(plot_relative_profit_sunburst(current_stats))
@@ -399,30 +418,33 @@ def append_figures(statistic: str, label_text: list) -> str:
     sunburst = sunburst.update_traces(insidetextorientation='radial')
     sunburst.update_layout(margin=dict(l=10, r=10, t=10, b=10))
 
+    if type(label_text) is list:
+        label_text = label_text[0]
+
     if statistic == 'relative_profit':
         historical = plot_historical_relative_profit(assets)
     else:
-        historical = plot_historical_data(assets, statistic, label_text[0])
+        historical = plot_historical_data(assets, statistic, label_text)
 
     return Html.columns([Html.Column(width=30, content=sunburst.to_html(full_html=False, include_plotlyjs=True)),
         Html.Column(content=historical.to_html(full_html=False, include_plotlyjs=True))])
 
 def append_asset_data_view(data: pd.DataFrame):
 
-    name = data.iloc[-1]['name']
+    name = data.loc[data.index[-1], 'name']
     if 'symbol' in data.columns:
-        if pd.notnull(data.iloc[-1]['symbol']):
-            name += ' ({})'.format(data.iloc[-1]['symbol'])
+        if pd.notnull(data.loc[data.index[-1], 'symbol']):
+            name += ' ({})'.format(data.loc[data.index[-1], 'symbol'])
     if 'account' in data.columns:
-        name += '<br>{}'.format(data.iloc[-1]['account'])
+        name += '<br>{}'.format(data.loc[data.index[-1], 'account'])
     output = '<h2>' + name + '</h2>'
 
-    statistics = [Html.label('Value', Html.Value(data.iloc[-1]['value'], '€'))]
-    statistics.append(Html.label('Funds invested', Html.Value(data.iloc[-1]['cash_invested'], '€')))
-    if data.iloc[-1]['return_received'] != 0:
-        statistics.append(Html.label('Return received', Html.Value(data.iloc[-1]['return_received'], '€')))
-    statistics.append(Html.label('Net profit', Html.Value(data.iloc[-1]['profit'], '€').color()))
-    statistics.append(Html.label('Relative net profit', Html.Value(data.iloc[-1]['relative_profit'], '%').color()))
+    statistics = [Html.label('Value', Html.Value(data.loc[data.index[-1], 'value'], '€'))]
+    statistics.append(Html.label('Funds invested', Html.Value(data.loc[data.index[-1], 'cash_invested'], '€')))
+    if data.loc[data.index[-1], 'return_received'] != 0:
+        statistics.append(Html.label('Return received', Html.Value(data.loc[data.index[-1], 'return_received'], '€')))
+    statistics.append(Html.label('Net profit', Html.Value(data.loc[data.index[-1], 'profit'], '€').color()))
+    statistics.append(Html.label('Relative net profit', Html.Value(data.loc[data.index[-1], 'relative_profit'], '%').color()))
     output += Html.columns(statistics)
     if (len(data) > 1):
         output += Html.columns([Html.Column(width=30, content=plot_yearly_asset_data(data).to_html(full_html=False, include_plotlyjs=True)),
@@ -431,12 +453,12 @@ def append_asset_data_view(data: pd.DataFrame):
 
 def append_overall_data_tabs(document: dominate.document):
     tabs = [Html.Tab(Html.label('Value', Html.Value(current_stats['value'].sum(), '€')),
-        append_figures('value', ['Value', '']), checked=True)]
+        append_figures('value', 'Value'), checked=True)]
     tabs.append(Html.Tab(Html.label('Funds invested', Html.Value(current_stats['cash_invested'].sum(), '€')),
-        append_figures('cash_invested', ['Funds invested', ''])))
+        append_figures('cash_invested', 'Funds invested')))
     if current_stats['return_received'].sum() > 0:
         tabs.append(Html.Tab(Html.label('Return received', Html.Value(current_stats['return_received'].sum(), '€')),
-            append_figures('return_received', ['Return received', ''])))
+            append_figures('return_received', 'Return received')))
     tabs.append(Html.Tab(Html.label('Net profit', Html.Value(current_stats['profit'].sum(), '€').color()),
         append_figures('profit', ['Profit', 'Loss'])))
     tabs.append(Html.Tab(Html.label('Relative net profit', Html.Value((current_stats['profit'].sum()/current_stats['cash_invested'].sum())*100, '%').color()),
@@ -450,7 +472,7 @@ def append_asset_data_tabs(document: dominate.document):
 
     tabs = []
     for g in groups:
-        group_assets = assets[assets['group'] == g]['name'].unique()
+        group_assets = assets.loc[assets['group'] == g, 'name'].unique()
         content = ''
         if len(group_assets) > 1:
             group_total = assets[assets['group'] == g].groupby('date').sum().reset_index()
@@ -504,10 +526,11 @@ if __name__ == '__main__':
 
     color_map = asset_properties.to_dict()['color']
 
-    current_stats = assets.groupby('name')[['name', 'symbol', 'group', 'account', 'cash_invested', 'return_received', 'value', 'profit', 'relative_profit', 'color']].tail(1)
-
     earliest_date = assets.groupby('date')['date'].head().iloc[0]
     latest_date = assets.groupby('date')['date'].tail().iloc[-1]
+
+    current_stats = assets.groupby('name')[['name', 'symbol', 'group', 'account', 'cash_invested', 'return_received', 'value', 'profit', 'relative_profit', 'color', 'date']].tail(1)
+    current_stats = current_stats[current_stats['date'] > latest_date - pd.DateOffset(months=6)]  # TODO: take months value from settings
 
     print(current_stats)
     print(assets[assets.duplicated()])
