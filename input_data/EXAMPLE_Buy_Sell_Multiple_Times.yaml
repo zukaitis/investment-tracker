@@ -1,0 +1,28 @@
+---
+name: Buy-Sell Multiple Times, Inc
+symbol: BSMT
+account: Shady Offshore Bank
+group: Stocks
+data:
+  - { date: 2018-08, cash: +700, amount: 300, price: 2.34 }
+  - { date: 2018-09, price: 2.4 }
+  - { date: 2018-10, price: 2.5, return: 10 }
+  - { date: 2018-11, price: 2.4 }
+  - { date: 2018-12, price: 2.4 }
+  - { date: 2019-01, price: 2.42 }
+  - { date: 2019-02, price: 2.44, cash: -732, amount: 0 }
+  - { date: 2019-06, price: 2.44, cash: 488, amount: 200 }
+  - { date: 2019-07, price: 2.48 }
+  - { date: 2019-08, price: 2.44 }
+  - { date: 2019-09, price: 2.54, return: 8 }
+  - { date: 2019-10, price: 2.58, return: 3 }
+  - { date: 2019-11, price: 2.5 }
+  - { date: 2019-12, price: 2.46 }
+  - { date: 2020-01, price: 2, cash: -375, amount: 0 }
+  - { date: 2020-02, price: 2.1 }
+  - { date: 2020-06, price: 2.0 }
+  - { date: 2020-07, price: 1.89, cash: +300, amount: 150 }
+  - { date: 2020-08, price: 1.84 }
+  - { date: 2020-09, price: 1.85 }
+  - { date: 2020-10, price: 2.02, return: 7.77 }
+  - { date: 2020-11, price: 1.93 }

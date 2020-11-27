@@ -101,19 +101,24 @@ class Html:
                     c.width = width
         return output
 
-def process_data(input_data : list) -> pd.DataFrame:
-    data = pd.DataFrame(input_data)
+def process_data(input_data) -> pd.DataFrame:
+    if type(input_data) is pd.DataFrame:
+        data = input_data.copy()
+    else:
+        data = pd.DataFrame(input_data)
 
     data['date'] = pd.to_datetime(data['date'])
     if data.duplicated(subset='date').any():
-        warnings.warn('There are duplicate dates in "{}" dataset:\n{}'.format(
-            data.loc[data.index[0], 'name'],
-            data.loc[data.duplicated(subset='date'),'date']))
+        warnings.warn(
+            'WARNING: There are duplicate dates in "{}" dataset:\n{}'.format(
+                data.loc[data.index[0], 'name'],
+                data.loc[data.duplicated(subset='date'),'date']))
         data.drop_duplicates(subset=['date'], inplace=True)
     data.sort_values(by=['date'], inplace=True)
 
     data['cash'] = pd.to_numeric(data['cash'])
     data['cash'] = data['cash'].fillna(0.0)
+    data['cash_invested'] = data['cash'].cumsum()
 
     if 'return' in data.columns:
         data['return'] = pd.to_numeric(data['return'])
@@ -127,28 +132,61 @@ def process_data(input_data : list) -> pd.DataFrame:
 
     if 'price' in data.columns:
         data['price'] = pd.to_numeric(data['price'])
+        data['price'] = data['price'].interpolate(method='pad')
     
     if 'value' in data.columns:
         data['value'] = pd.to_numeric(data['value'])
 
     if ('amount' in data.columns) and ('price' in data.columns):
         if 'value' in data.columns:
-            data['value'] = np.where(pd.notna(data['value']), data['value'], data['amount'] * data['price'])
-            data['price'] = data['value'] / data['amount']
+            data['value'] = np.where(pd.notna(data['value']),
+                data['value'], data['amount'] * data['price'])
         else:
             data['value'] = data['amount'] * data['price']
 
-    data['value'] = data['value'].interpolate(method='linear') if 'value' in data else 0.0
+    if 'value' in data.columns:
+        data['value'] = data['value'].interpolate(method='pad')
+    else:
+        data['value'] = 0.0
+    data['value'] = data['value'].fillna(0.0)
 
-    data['cash_invested'] = data['cash'].cumsum()
-    data['return_received'] = data['return'].cumsum()
+    nonzero_after_zero_mask = ((data['value'] != 0)
+        & (data['value'].shift(1) == 0))
+    zero_after_zero_mask = ((data['value'] == 0)
+        & ((data['value'].shift(1) == 0) | pd.isna(data['value'].shift(1))))
+    data['period'] = np.where(nonzero_after_zero_mask, 1, np.nan)
+    data['period'] = data['period'].cumsum().interpolate(method='pad')
+    data['period'] = data['period'].fillna(0)
+    data.drop(data[zero_after_zero_mask].index, inplace=True)
+
+    data['return_received'] = 0.0
+    for p in data['period'].unique():
+        data.loc[data['period'] == p, 'return_received'] = data.loc[data['period'] == p, 'return'].cumsum()
+
+    #data['return_received'] = data['return'].cumsum()
     data['profit'] = data['value'] - data['cash_invested'] + data['return_received']
     data['cash_invested'] = np.where(data['cash_invested'] < 0, 0, data['cash_invested'])
-    data['relative_profit'] = (data['profit'] / data['cash_invested']) * 100
-    data['relative_profit'] = np.where(np.isinf(data['relative_profit']),
-        (data['profit'] / max(data['cash_invested']) * 100), data['relative_profit'])
+    data['relative_return'] = data['return'] / data['value']
+    data['relative_return_cumulative'] = data['relative_return'].cumsum()
+    # data['cash_invested_nonzero'] = np.where(data['cash_invested'] == 0,
+    #     max(data['cash_invested']), data['cash_invested'])
+    data['relative_profit'] = (data['relative_return_cumulative']
+        + (data['value'] - data['cash_invested']) / data['cash_invested']) * 100
 
     return data
+
+def calculate_monthly_values(input: pd.DataFrame) -> pd.DataFrame:
+    daily = input.copy()
+    group_by_month = daily.groupby(
+        [daily['name'], daily['date'].dt.year, daily['date'].dt.month])
+    monthly = group_by_month.tail(1).copy().reset_index()
+    sum = group_by_month.agg(cash=('cash', 'sum'), rtrn=('return', 'sum'))
+    sum.index = monthly.index
+    monthly['return'] = sum['rtrn']
+    monthly['cash'] = sum['cash']
+    monthly['date'] = monthly['date'].map(lambda x: x.replace(day=1))
+
+    return monthly
 
 def plot_sunburst(input: pd.DataFrame,
         values: str, label_text) -> go.Sunburst:
@@ -241,8 +279,8 @@ def plot_relative_profit_sunburst(input: pd.DataFrame) -> go.Sunburst:
 
     return go.Sunburst(labels=data['label'], parents=data['parent'], values=data['relative_profit_sum'], customdata=data['relative_profit'], marker=dict(colors=data['color']),
         branchvalues='total', hovertemplate =
-            "<b>%{label}</b><br>" +
-            "Relative net profit: %{customdata:.2f}%<extra></extra>")
+            '<b>%{label}</b><br>' +
+            'Relative net profit: %{customdata:.2f}%<extra></extra>')
 
 def plot_historical_data(dataframe: pd.DataFrame, values: str, label_text: str) -> go.Figure:
     value_by_date = dataframe.pivot(index='date', columns='name', values=values)
@@ -252,8 +290,8 @@ def plot_historical_data(dataframe: pd.DataFrame, values: str, label_text: str) 
     value_by_date_sum = value_by_date.sum(axis = 1, skipna = True)
     fig.add_trace(go.Scatter(x=value_by_date_sum.index, y=value_by_date_sum.values, mode='lines+markers', name='Total',
         marker=dict(color=cyan), hovertemplate =
-            "%{x|%B %Y}<br>" +
-            "<b>Total " + label_text.lower() + ":</b> %{y:.2f}€<extra></extra>"))
+            '%{x|%B %Y}<br>' +
+            '<b>Total ' + label_text.lower() + ':</b> %{y:.2f}€<extra></extra>'))
 
     for a in asset_properties.index:
         if not ((value_by_date[a].nunique() == 1) and (value_by_date[a].sum() == 0)):
@@ -302,55 +340,57 @@ def plot_historical_relative_profit(dataframe: pd.DataFrame) -> go.Figure:
     return fig
 
 def plot_historical_asset_data(input: pd.DataFrame) -> go.Figure:
-    data = input.copy()
     fig = go.Figure()
 
-    data['value_and_return'] = data['cash_invested'] + data['profit']
-    data['red_fill'] = np.where(
-        data['cash_invested'] > data['return_received'],
-        data['cash_invested'], data['return_received'])
+    for p in input['period'].unique():
+        data = input[input['period'] == p].copy()
+        data['value_and_return'] = data['cash_invested'] + data['profit']
+        data['red_fill'] = np.where(
+            data['cash_invested'] > data['return_received'],
+            data['cash_invested'], data['return_received'])
 
-    fig.add_trace(go.Scatter(x=data['date'], y=data['red_fill'],
-        fill='tozeroy', mode='none', fillcolor='rgba(255,0,0,0.7)',
-        hoverinfo='skip'))
-    fig.add_trace(go.Scatter(x=data['date'], y=data['cash_invested'],
-        mode='none',
-        hovertemplate = "Cash invested: %{y:.2f}€<extra></extra>"))
-    data['f_profit'] = data['profit'].map('{:,.2f}€ / '.format)
-    data['f_relative_profit'] = data['relative_profit'].map('{:,.2f}%'.format)
-    data['profit_string'] = data['f_profit'] + data['f_relative_profit']
-    
-    fig.add_trace(go.Scatter(x=data['date'], y=data['value_and_return'], fill='tozeroy', mode='none', fillcolor='rgba(0,255,0,0.7)',
-        customdata=data['profit_string'],
-        hovertemplate =
-            "Net profit: %{customdata}<extra></extra>"))
-
-    blue_fill_mode = 'tozeroy'
-    if max(data['return_received']) > 0:
-        fig.add_trace(go.Scatter(x=data['date'], y=data['return_received'], fill='tozeroy', mode='none', fillcolor='rgba(0,0,0,0)',
+        fig.add_trace(go.Scatter(x=data['date'], y=data['red_fill'],
+            fill='tozeroy', mode='none', fillcolor='rgba(255,0,0,0.7)',
+            hoverinfo='skip'))
+        fig.add_trace(go.Scatter(x=data['date'], y=data['cash_invested'],
+            mode='none',
+            hovertemplate = "Cash invested: %{y:.2f}€<extra></extra>"))
+        data['f_profit'] = data['profit'].map('{:,.2f}€ / '.format)
+        data['f_relative_profit'] = data['relative_profit'].map('{:,.2f}%'.format)
+        data['profit_string'] = data['f_profit'] + data['f_relative_profit']
+        
+        fig.add_trace(go.Scatter(x=data['date'], y=data['value_and_return'], fill='tozeroy', mode='none', fillcolor='rgba(0,255,0,0.7)',
+            customdata=data['profit_string'],
             hovertemplate =
-                "Return received: %{y:.2f}€<extra></extra>"))
-        blue_fill_mode = 'tonexty'
+                "Net profit: %{customdata}<extra></extra>"))
 
-    blue_fill = data[['date', 'red_fill', 'value_and_return']].copy()
-    blue_fill.index *= 2
-    blue_fill['y'] = np.where(blue_fill['red_fill'] < blue_fill['value_and_return'], blue_fill['red_fill'], data['value_and_return'])
-    blue_fill['profitable'] = (blue_fill['y'] == blue_fill['red_fill'])
-    mask = blue_fill.iloc[:-1]['profitable'] ^ blue_fill['profitable'].shift(-1)
-    intermediate_values = blue_fill[mask].copy()
-    intermediate_values.index += 1
-    intermediate_values['y'] = np.nan
-    blue_fill = blue_fill.append(intermediate_values).sort_index().reset_index(drop=True)
-    blue_fill['slope'] = abs(blue_fill['value_and_return'] - blue_fill['red_fill']) / (abs(blue_fill['value_and_return'] - blue_fill['red_fill']) + abs(blue_fill.shift(-1)['value_and_return'] - blue_fill.shift(-1)['red_fill']))
-    blue_fill['date'] = np.where(pd.isna(blue_fill['y']), (blue_fill.shift(-1)['date'] - blue_fill['date']) * blue_fill['slope'] + blue_fill['date'], blue_fill['date'])
-    blue_fill['y'] = np.where(pd.isna(blue_fill['y']), (blue_fill.shift(-1)['red_fill'] - blue_fill['red_fill']) * blue_fill['slope'] + blue_fill['red_fill'], blue_fill['y'])
-    fig.add_trace(go.Scatter(x=blue_fill['date'], y=blue_fill['y'], fill=blue_fill_mode, mode='none', fillcolor='rgba(0,0,255,0.5)',
-        hoverinfo='skip'))
+        blue_fill_mode = 'tozeroy'
+        if max(data['return_received']) > 0:
+            fig.add_trace(go.Scatter(x=data['date'], y=data['return_received'], fill='tozeroy', mode='none', fillcolor='rgba(0,0,0,0)',
+                hovertemplate =
+                    "Return received: %{y:.2f}€<extra></extra>"))
+            blue_fill_mode = 'tonexty'
 
-    if max(data['value']) > 0:
-        fig.add_trace(go.Scatter(x=data['date'], y=data['value'], mode='lines', line=dict(color='yellow'),
-            hovertemplate =
-                "Value: %{y:.2f}€<extra></extra>"))
+        blue_fill = data[['date', 'red_fill', 'value_and_return']].copy()
+        blue_fill.index *= 2
+        blue_fill['y'] = np.where(blue_fill['red_fill'] < blue_fill['value_and_return'], blue_fill['red_fill'], data['value_and_return'])
+        blue_fill['profitable'] = (blue_fill['y'] == blue_fill['red_fill'])
+        mask = blue_fill.iloc[:-1]['profitable'] ^ blue_fill['profitable'].shift(-1)
+        intermediate_values = blue_fill[mask].copy()
+        intermediate_values.index += 1
+        intermediate_values['y'] = np.nan
+        blue_fill = blue_fill.append(intermediate_values).sort_index().reset_index(drop=True)
+        blue_fill['slope'] = abs(blue_fill['value_and_return'] - blue_fill['red_fill']) / (abs(blue_fill['value_and_return'] - blue_fill['red_fill']) + abs(blue_fill.shift(-1)['value_and_return'] - blue_fill.shift(-1)['red_fill']))
+        blue_fill['date'] = np.where(pd.isna(blue_fill['y']), (blue_fill.shift(-1)['date'] - blue_fill['date']) * blue_fill['slope'] + blue_fill['date'], blue_fill['date'])
+        blue_fill['y'] = np.where(pd.isna(blue_fill['y']), (blue_fill.shift(-1)['red_fill'] - blue_fill['red_fill']) * blue_fill['slope'] + blue_fill['red_fill'], blue_fill['y'])
+        fig.add_trace(go.Scatter(x=blue_fill['date'], y=blue_fill['y'], fill=blue_fill_mode, mode='none', fillcolor='rgba(0,0,255,0.5)',
+            hoverinfo='skip'))
+
+        if max(data['value']) > 0:
+            fig.add_trace(go.Scatter(x=data['date'], y=data['value'], mode='lines', line=dict(color='yellow'),
+                hovertemplate =
+                    "Value: %{y:.2f}€<extra></extra>"))
+
     fig.update_layout(hovermode='x', showlegend=False)
     fig.update_layout(hoverlabel=dict(bgcolor='white'))
     configure_historical_dataview(fig)
@@ -379,12 +419,15 @@ def plot_yearly_asset_data(data: pd.DataFrame) -> go.Figure:
         yearly_data.loc[yearly_data.index[-1], 'date'] += 1
     yearly_data.drop(yearly_data.head(1).index, inplace=True)
 
-    fig.add_trace(go.Bar(x=yearly_data['date'], y=yearly_data['return_received'], marker=dict(color='rgb(73,200,22)'),
+    fig.add_trace(go.Bar(x=yearly_data['date'],
+        y=yearly_data['return_received'], marker=dict(color='rgb(73,200,22)'),
+        # single column looks ugly otherwise
         width=[0.5] if (len(yearly_data) == 1) else None,
         hovertemplate =
             "<b>%{x}</b><br>" +
             "Return received: %{y:.2f}€<extra></extra>"))
-    fig.add_trace(go.Bar(x=yearly_data['date'], y=yearly_data['value_change'], marker=dict(color='rgb(36,99,139)'),
+    fig.add_trace(go.Bar(x=yearly_data['date'], y=yearly_data['value_change'],
+        marker=dict(color='rgb(36,99,139)'),
         width=[0.5] if (len(yearly_data) == 1) else None,
         hovertemplate =
             "<b>%{x}</b><br>" +
@@ -422,12 +465,14 @@ def append_figures(statistic: str, label_text) -> str:
         label_text = label_text[0]
 
     if statistic == 'relative_profit':
-        historical = plot_historical_relative_profit(assets)
+        historical = plot_historical_relative_profit(monthly_data)
     else:
-        historical = plot_historical_data(assets, statistic, label_text)
+        historical = plot_historical_data(monthly_data, statistic, label_text)
 
-    return Html.columns([Html.Column(width=30, content=sunburst.to_html(full_html=False, include_plotlyjs=True)),
-        Html.Column(content=historical.to_html(full_html=False, include_plotlyjs=True))])
+    return Html.columns([Html.Column(width=30, content=sunburst.to_html(
+            full_html=False, include_plotlyjs=True)),
+        Html.Column(content=historical.to_html(
+            full_html=False, include_plotlyjs=True))])
 
 def append_asset_data_view(data: pd.DataFrame):
 
@@ -476,6 +521,7 @@ def append_asset_data_tabs(document: dominate.document):
         content = ''
         if len(group_assets) > 1:
             group_total = assets[assets['group'] == g].groupby('date').sum().reset_index()
+            group_total = process_data(group_total)
             group_total['name'] = '{} Total'.format(g)
             group_total['relative_profit'] = (group_total['profit'] / group_total['cash_invested']) * 100
             content += append_asset_data_view(group_total)
@@ -486,6 +532,9 @@ def append_asset_data_tabs(document: dominate.document):
 
 
 if __name__ == '__main__':
+    # making warnings not show source, since it's irrelevant
+    warnings.formatwarning = lambda msg, *args, **kwargs: f'{msg}\n'
+
     parser = argparse.ArgumentParser()
     parser.add_argument( 'input_dir', type = str, nargs = '?', default = None )
     arguments = parser.parse_args()
@@ -522,6 +571,8 @@ if __name__ == '__main__':
     assets = assets.merge(asset_properties)
     asset_properties = asset_properties.sort_values(by=['group', 'name'])
     asset_properties = asset_properties.set_index('name')
+
+    pd.set_option('display.max_rows', None)
     print(asset_properties)
 
     color_map = asset_properties.to_dict()['color']
@@ -532,8 +583,7 @@ if __name__ == '__main__':
     current_stats = assets.groupby('name')[['name', 'symbol', 'group', 'account', 'cash_invested', 'return_received', 'value', 'profit', 'relative_profit', 'color', 'date']].tail(1)
     current_stats = current_stats[current_stats['date'] > latest_date - pd.DateOffset(months=6)]  # TODO: take months value from settings
 
-    print(current_stats)
-    print(assets[assets.duplicated()])
+    monthly_data = calculate_monthly_values(assets)
 
     d = dominate.document()
     d.head += raw('<meta charset="utf-8"/>')

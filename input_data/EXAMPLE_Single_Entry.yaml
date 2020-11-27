@@ -1,0 +1,7 @@
+---
+name: Single Entry, Inc
+symbol: SIEN
+account: Local Bank
+group: Stocks
+data:
+  - { date: 2020-10, cash: +100, amount: 90, price: 1.125 }
