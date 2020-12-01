@@ -118,7 +118,6 @@ def process_data(input_data) -> pd.DataFrame:
 
     data['cash'] = pd.to_numeric(data['cash'])
     data['cash'] = data['cash'].fillna(0.0)
-    data['cash_invested'] = data['cash'].cumsum()
 
     if 'return' in data.columns:
         data['return'] = pd.to_numeric(data['return'])
@@ -150,28 +149,25 @@ def process_data(input_data) -> pd.DataFrame:
         data['value'] = 0.0
     data['value'] = data['value'].fillna(0.0)
 
-    nonzero_after_zero_mask = ((data['value'] != 0)
-        & (data['value'].shift(1) == 0))
-    zero_after_zero_mask = ((data['value'] == 0)
-        & ((data['value'].shift(1) == 0) | pd.isna(data['value'].shift(1))))
+    nonzero_after_zero_mask = ((data['value'] != 0) & (data['value'].shift(1) == 0))
+    zero_after_zero_mask = ((data['value'] == 0) 
+        & ((data['value'].shift(1) == 0)
+        | pd.isna(data['value'].shift(1))))
     data['period'] = np.where(nonzero_after_zero_mask, 1, np.nan)
     data['period'] = data['period'].cumsum().interpolate(method='pad')
     data['period'] = data['period'].fillna(0)
     data.drop(data[zero_after_zero_mask].index, inplace=True)
 
-    data['return_received'] = 0.0
+    data = data.assign(return_received=0, net_investment=0, net_investment_max=0)
     for p in data['period'].unique():
-        data.loc[data['period'] == p, 'return_received'] = data.loc[data['period'] == p, 'return'].cumsum()
+        mask = (data['period'] == p)
+        data.loc[mask, 'return_received'] = data.loc[mask, 'return'].cumsum()
+        data.loc[mask, 'net_investment'] = data.loc[mask, 'cash'].cumsum()
+        data.loc[mask, 'net_investment_max'] = data.loc[mask, 'net_investment'].cummax()
 
-    #data['return_received'] = data['return'].cumsum()
-    data['profit'] = data['value'] - data['cash_invested'] + data['return_received']
-    data['cash_invested'] = np.where(data['cash_invested'] < 0, 0, data['cash_invested'])
-    data['relative_return'] = data['return'] / data['value']
-    data['relative_return_cumulative'] = data['relative_return'].cumsum()
-    # data['cash_invested_nonzero'] = np.where(data['cash_invested'] == 0,
-    #     max(data['cash_invested']), data['cash_invested'])
-    data['relative_profit'] = (data['relative_return_cumulative']
-        + (data['value'] - data['cash_invested']) / data['cash_invested']) * 100
+    data['profit'] = data['value'] - data['net_investment'] + data['return_received']
+    data['net_investment'] = np.where(data['net_investment'] < 0, 0, data['net_investment'])
+    data['relative_profit'] = (data['profit'] / data['net_investment_max']) * 100
 
     return data
 
@@ -267,7 +263,7 @@ def plot_relative_profit_sunburst(input: pd.DataFrame) -> go.Sunburst:
         d['relative_profit_sum'] = dataframe.groupby(path[i]).sum().reset_index()['relative_profit_sum']
         d['sign'] = np.where(d['relative_profit_sum'] > 0, 'Profit', 'Loss')
         d['relative_profit_sum'] = abs(d['relative_profit_sum'])
-        d['relative_profit'] = (dataframe.groupby(path[i]).sum().reset_index()['profit'] / dataframe.groupby(path[i]).sum().reset_index()['cash_invested']) * 100
+        d['relative_profit'] = (dataframe.groupby(path[i]).sum().reset_index()['profit'] / dataframe.groupby(path[i]).sum().reset_index()['net_investment']) * 100
         d = d[[path[i], path[i-1], 'relative_profit', 'relative_profit_sum', 'sign', 'color']]
         d.columns = ['label', 'parent', 'relative_profit', 'relative_profit_sum', 'sign', 'color']
         d = d.drop(d[d.label == d.parent].index)  # remove rows, where label matches parent
@@ -316,8 +312,8 @@ def plot_historical_relative_profit(dataframe: pd.DataFrame) -> go.Figure:
 
     fig = go.Figure()
 
-    overall = dataframe.groupby('date').sum()[['profit', 'cash_invested']]
-    overall['values'] = (overall['profit'] / overall['cash_invested']) * 100
+    overall = dataframe.groupby('date').sum()[['profit', 'net_investment_max']]
+    overall['values'] = (overall['profit'] / overall['net_investment_max']) * 100
     fig.add_trace(go.Scatter(x=overall.index, y=overall['values'], mode='lines+markers', name='Total',
         marker=dict(color=cyan), hovertemplate =
             "%{x|%B %Y}<br>"+
@@ -344,15 +340,15 @@ def plot_historical_asset_data(input: pd.DataFrame) -> go.Figure:
 
     for p in input['period'].unique():
         data = input[input['period'] == p].copy()
-        data['value_and_return'] = data['cash_invested'] + data['profit']
+        data['value_and_return'] = data['net_investment'] + data['profit']
         data['red_fill'] = np.where(
-            data['cash_invested'] > data['return_received'],
-            data['cash_invested'], data['return_received'])
+            data['net_investment'] > data['return_received'],
+            data['net_investment'], data['return_received'])
 
         fig.add_trace(go.Scatter(x=data['date'], y=data['red_fill'],
             fill='tozeroy', mode='none', fillcolor='rgba(255,0,0,0.7)',
             hoverinfo='skip'))
-        fig.add_trace(go.Scatter(x=data['date'], y=data['cash_invested'],
+        fig.add_trace(go.Scatter(x=data['date'], y=data['net_investment'],
             mode='none',
             hovertemplate = "Cash invested: %{y:.2f}€<extra></extra>"))
         data['f_profit'] = data['profit'].map('{:,.2f}€ / '.format)
@@ -485,7 +481,7 @@ def append_asset_data_view(data: pd.DataFrame):
     output = '<h2>' + name + '</h2>'
 
     statistics = [Html.label('Value', Html.Value(data.loc[data.index[-1], 'value'], '€'))]
-    statistics.append(Html.label('Funds invested', Html.Value(data.loc[data.index[-1], 'cash_invested'], '€')))
+    statistics.append(Html.label('Funds invested', Html.Value(data.loc[data.index[-1], 'net_investment'], '€')))
     if data.loc[data.index[-1], 'return_received'] != 0:
         statistics.append(Html.label('Return received', Html.Value(data.loc[data.index[-1], 'return_received'], '€')))
     statistics.append(Html.label('Net profit', Html.Value(data.loc[data.index[-1], 'profit'], '€').color()))
@@ -499,14 +495,14 @@ def append_asset_data_view(data: pd.DataFrame):
 def append_overall_data_tabs(document: dominate.document):
     tabs = [Html.Tab(Html.label('Value', Html.Value(current_stats['value'].sum(), '€')),
         append_figures('value', 'Value'), checked=True)]
-    tabs.append(Html.Tab(Html.label('Funds invested', Html.Value(current_stats['cash_invested'].sum(), '€')),
-        append_figures('cash_invested', 'Funds invested')))
+    tabs.append(Html.Tab(Html.label('Funds invested', Html.Value(current_stats['net_investment'].sum(), '€')),
+        append_figures('net_investment', 'Funds invested')))
     if current_stats['return_received'].sum() > 0:
         tabs.append(Html.Tab(Html.label('Return received', Html.Value(current_stats['return_received'].sum(), '€')),
             append_figures('return_received', 'Return received')))
     tabs.append(Html.Tab(Html.label('Net profit', Html.Value(current_stats['profit'].sum(), '€').color()),
         append_figures('profit', ['Profit', 'Loss'])))
-    tabs.append(Html.Tab(Html.label('Relative net profit', Html.Value((current_stats['profit'].sum()/current_stats['cash_invested'].sum())*100, '%').color()),
+    tabs.append(Html.Tab(Html.label('Relative net profit', Html.Value((current_stats['profit'].sum()/current_stats['net_investment'].sum())*100, '%').color()),
         append_figures('relative_profit', ['Profit', 'Loss'])))
 
     document += raw(Html.tab_container(tabs))
@@ -523,7 +519,6 @@ def append_asset_data_tabs(document: dominate.document):
             group_total = assets[assets['group'] == g].groupby('date').sum().reset_index()
             group_total = process_data(group_total)
             group_total['name'] = '{} Total'.format(g)
-            group_total['relative_profit'] = (group_total['profit'] / group_total['cash_invested']) * 100
             content += append_asset_data_view(group_total)
         for a in group_assets:
             content += append_asset_data_view(assets[assets['name'] == a])
@@ -580,7 +575,7 @@ if __name__ == '__main__':
     earliest_date = assets.groupby('date')['date'].head().iloc[0]
     latest_date = assets.groupby('date')['date'].tail().iloc[-1]
 
-    current_stats = assets.groupby('name')[['name', 'symbol', 'group', 'account', 'cash_invested', 'return_received', 'value', 'profit', 'relative_profit', 'color', 'date']].tail(1)
+    current_stats = assets.groupby('name')[['name', 'symbol', 'group', 'account', 'net_investment', 'return_received', 'value', 'profit', 'relative_profit', 'color', 'date']].tail(1)
     current_stats = current_stats[current_stats['date'] > latest_date - pd.DateOffset(months=6)]  # TODO: take months value from settings
 
     monthly_data = calculate_monthly_values(assets)
