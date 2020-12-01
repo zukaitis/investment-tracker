@@ -4,7 +4,7 @@ symbol: SAPR
 account: Local Bank
 group: Stocks
 data:
-  - { date: 2018-08, cash: +500, amount: 450, price: 1.125 }
+  - { date: 2018-08, investment: +500, amount: 450, price: 1.125 }
   - { date: 2018-09, price: 1.105 }
   - { date: 2018-10, price: 1.115 }
   - { date: 2018-11, price: 1.105 }
@@ -31,4 +31,4 @@ data:
   - { date: 2020-07, price: 1.395 }
   - { date: 2020-08, price: 1.55 }
   - { date: 2020-09, price: 1.595 }
-  - { date: 2020-10, cash: -780, price: 1.56, value: 0 }
+  - { date: 2020-10, investment: -780, price: 1.56, value: 0 }

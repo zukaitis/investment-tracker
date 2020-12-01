@@ -4,4 +4,4 @@ symbol: SIEN
 account: Local Bank
 group: Stocks
 data:
-  - { date: 2020-10, cash: +100, amount: 90, price: 1.125 }
+  - { date: 2020-10, investment: +100, amount: 90, price: 1.125 }

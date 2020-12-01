@@ -116,8 +116,8 @@ def process_data(input_data) -> pd.DataFrame:
         data.drop_duplicates(subset=['date'], inplace=True)
     data.sort_values(by=['date'], inplace=True)
 
-    data['cash'] = pd.to_numeric(data['cash'])
-    data['cash'] = data['cash'].fillna(0.0)
+    data['investment'] = pd.to_numeric(data['investment'])
+    data['investment'] = data['investment'].fillna(0.0)
 
     if 'return' in data.columns:
         data['return'] = pd.to_numeric(data['return'])
@@ -150,19 +150,17 @@ def process_data(input_data) -> pd.DataFrame:
     data['value'] = data['value'].fillna(0.0)
 
     nonzero_after_zero_mask = ((data['value'] != 0) & (data['value'].shift(1) == 0))
-    zero_after_zero_mask = ((data['value'] == 0) 
-        & ((data['value'].shift(1) == 0)
-        | pd.isna(data['value'].shift(1))))
+    zero_mask = (data['value'] == 0) & (data['investment'] == 0)
     data['period'] = np.where(nonzero_after_zero_mask, 1, np.nan)
     data['period'] = data['period'].cumsum().interpolate(method='pad')
     data['period'] = data['period'].fillna(0)
-    data.drop(data[zero_after_zero_mask].index, inplace=True)
+    data.drop(data[zero_mask].index, inplace=True)
 
     data = data.assign(return_received=0, net_investment=0, net_investment_max=0)
     for p in data['period'].unique():
         mask = (data['period'] == p)
         data.loc[mask, 'return_received'] = data.loc[mask, 'return'].cumsum()
-        data.loc[mask, 'net_investment'] = data.loc[mask, 'cash'].cumsum()
+        data.loc[mask, 'net_investment'] = data.loc[mask, 'investment'].cumsum()
         data.loc[mask, 'net_investment_max'] = data.loc[mask, 'net_investment'].cummax()
 
     data['profit'] = data['value'] - data['net_investment'] + data['return_received']
@@ -176,10 +174,10 @@ def calculate_monthly_values(input: pd.DataFrame) -> pd.DataFrame:
     group_by_month = daily.groupby(
         [daily['name'], daily['date'].dt.year, daily['date'].dt.month])
     monthly = group_by_month.tail(1).copy().reset_index()
-    sum = group_by_month.agg(cash=('cash', 'sum'), rtrn=('return', 'sum'))
+    sum = group_by_month.agg(investment=('investment', 'sum'), rtrn=('return', 'sum'))
     sum.index = monthly.index
     monthly['return'] = sum['rtrn']
-    monthly['cash'] = sum['cash']
+    monthly['investment'] = sum['investment']
     monthly['date'] = monthly['date'].map(lambda x: x.replace(day=1))
 
     return monthly
@@ -350,7 +348,7 @@ def plot_historical_asset_data(input: pd.DataFrame) -> go.Figure:
             hoverinfo='skip'))
         fig.add_trace(go.Scatter(x=data['date'], y=data['net_investment'],
             mode='none',
-            hovertemplate = "Cash invested: %{y:.2f}€<extra></extra>"))
+            hovertemplate = "Net investment: %{y:.2f}€<extra></extra>"))
         data['f_profit'] = data['profit'].map('{:,.2f}€ / '.format)
         data['f_relative_profit'] = data['relative_profit'].map('{:,.2f}%'.format)
         data['profit_string'] = data['f_profit'] + data['f_relative_profit']
@@ -572,8 +570,8 @@ if __name__ == '__main__':
 
     color_map = asset_properties.to_dict()['color']
 
-    earliest_date = assets.groupby('date')['date'].head().iloc[0]
-    latest_date = assets.groupby('date')['date'].tail().iloc[-1]
+    earliest_date = min(assets['date'])
+    latest_date = max(assets['date'])
 
     current_stats = assets.groupby('name')[['name', 'symbol', 'group', 'account', 'net_investment', 'return_received', 'value', 'profit', 'relative_profit', 'color', 'date']].tail(1)
     current_stats = current_stats[current_stats['date'] > latest_date - pd.DateOffset(months=6)]  # TODO: take months value from settings
@@ -585,11 +583,16 @@ if __name__ == '__main__':
     d.head += raw('<link rel="stylesheet" href="style.css">')
     d.head += raw('<title>Your investment portfolio</title>')
     d += raw('<h1>Your investment portfolio</h1>')
-    d += raw('<h3>Data from ' + earliest_date.strftime('%Y-%m-%d') + ' to ' + latest_date.strftime('%Y-%m-%d') + '</h3>')
+    d += raw('<h3>Data from ' + earliest_date.strftime('%Y-%m-%d') + ' to '
+        + latest_date.strftime('%Y-%m-%d') + '</h3>')
     append_overall_data_tabs(d)
     append_asset_data_tabs(d)
 
-    d += raw('<p class="link">Report generated on ' + datetime.date.today().strftime('%Y-%m-%d') + ', using open source script: <a href="https://github.com/zukaitis/investment-tracker/">Investment Tracker</a></p>')
+    d += raw('<p class="link">Report generated on ' + datetime.date.today().strftime('%Y-%m-%d')
+        + ', using open source script: '
+        + '<a href="https://github.com/zukaitis/investment-tracker/">Investment Tracker</a>'
+        + '<br>All charts are displayed using '
+        + '<a href="https://plotly.com/python/">Plotly</p>')
 
     with open('report.html', 'w') as f:
         print(d, file=f)

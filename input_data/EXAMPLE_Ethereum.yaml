@@ -38,5 +38,5 @@ data:
   - { date: 2018-03, price: 702.22}
   - { date: 2018-02, price: 901.55}
   - { date: 2018-01, price: 629.69}
-  - { date: 2017-12, price: 374.19, cash: +450, amount: 2}
-  - { date: 2017-11, price: 262.43, cash: +300, amount: 1}
+  - { date: 2017-12, price: 374.19, investment: +450, amount: 2}
+  - { date: 2017-11, price: 262.43, investment: +300, amount: 1}

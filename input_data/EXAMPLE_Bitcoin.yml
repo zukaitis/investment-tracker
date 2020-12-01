@@ -25,7 +25,7 @@ data:
   - { date: 2019-04, price: 3657.87 }
   - { date: 2019-03, price: 3388.58 }
   - { date: 2019-02, price: 3023.15 }
-  - { date: 2019-01, price: 3260.42, cash: -87.5, amount: 0.1 }
+  - { date: 2019-01, price: 3260.42, investment: -87.5, amount: 0.1 }
   - { date: 2018-12, price: 3555.65 }
   - { date: 2018-11, price: 5584.01 }
   - { date: 2018-10, price: 5703.89 }
@@ -38,7 +38,7 @@ data:
   - { date: 2018-03, price: 8519.28 }
   - { date: 2018-02, price: 8245.25 }
   - { date: 2018-01, price: 11758.21 }
-  - { date: 2017-12, price: 8571.69, cash: +1000, amount: 0.125 }
+  - { date: 2017-12, price: 8571.69, investment: +1000, amount: 0.125 }
   - { date: 2017-11, price: 5528.26 }
   - { date: 2017-10, price: 3675.12 }
   - { date: 2017-09, price: 3948.4 }

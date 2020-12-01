@@ -335,7 +335,7 @@ data:
   - { date: "Dec 31, 2019", price: 0.0018 }
   - { date: "Dec 30, 2019", price: 0.0019 }
   - { date: "Dec 29, 2019", price: 0.0018 }
-  - { date: "Dec 28, 2019", cash: +50, amount: 55555, price: 0.0018 }
+  - { date: "Dec 28, 2019", investment: +50, amount: 55555, price: 0.0018 }
   - { date: "Dec 27, 2019", price: 0.0019 }
   - { date: "Dec 26, 2019", price: 0.0019 }
   - { date: "Dec 25, 2019", price: 0.0019 }
@@ -345,7 +345,7 @@ data:
   - { date: "Dec 21, 2019", price: 0.0019 }
   - { date: "Dec 20, 2019", price: 0.0019 }
   - { date: "Dec 19, 2019", price: 0.002 }
-  - { date: "Dec 18, 2019", cash: +50, amount: 27777, price: 0.0018 }
+  - { date: "Dec 18, 2019", investment: +50, amount: 27777, price: 0.0018 }
   - { date: "Dec 17, 2019", price: 0.0019 }
   - { date: "Dec 16, 2019", price: 0.0019 }
   - { date: "Dec 15, 2019", price: 0.002 }
