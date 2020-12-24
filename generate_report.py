@@ -116,8 +116,11 @@ def process_data(input_data) -> pd.DataFrame:
         data.drop_duplicates(subset=['date'], inplace=True)
     data.sort_values(by=['date'], inplace=True)
 
-    data['investment'] = pd.to_numeric(data['investment'])
-    data['investment'] = data['investment'].fillna(0.0)
+    if 'investment' in data.columns:
+        data['investment'] = pd.to_numeric(data['investment'])
+        data['investment'] = data['investment'].fillna(0.0)
+    else:
+        data['investment'] = 0.0
 
     if 'return' in data.columns:
         data['return'] = pd.to_numeric(data['return'])
@@ -144,7 +147,7 @@ def process_data(input_data) -> pd.DataFrame:
             data['value'] = data['amount'] * data['price']
 
     if 'value' in data.columns:
-        data['value'] = data['value'].interpolate(method='pad')
+        data['value'] = data['value'].interpolate(method='linear')
     else:
         data['value'] = 0.0
     data['value'] = data['value'].fillna(0.0)
@@ -300,7 +303,49 @@ def plot_historical_data(dataframe: pd.DataFrame, values: str, label_text: str) 
     six_months = [value_by_date.index[-1] - datetime.timedelta(days=(365/2 - 15)), value_by_date.index[-1] + datetime.timedelta(days=15)]
     fig.update_xaxes(range=six_months)
     fig.update_yaxes(ticksuffix="€")
-    configure_historical_dataview(fig)
+    configure_historical_dataview(fig, latest_date - value_by_date.index[0])
+
+    return fig
+
+def plot_historical_return(dataframe: pd.DataFrame, values: str, label_text: str) -> go.Figure:
+    value_by_date = dataframe.pivot(index='date', columns='name', values='return')
+    value_by_date_cumulative = dataframe.pivot(index='date', columns='name',
+        values='return_received')
+
+    fig = go.Figure()
+
+    value_by_date_sum = value_by_date_cumulative.sum(axis = 1, skipna = True)
+    fig.add_trace(go.Scatter(x=value_by_date_sum.index, y=value_by_date_sum.values, mode='lines+markers', name='Total',
+        marker=dict(color=cyan), yaxis='y2', hovertemplate =
+            '%{x|%B %Y}<br>' +
+            '<b>Total return received:</b> %{y:.2f}€<extra></extra>'))
+
+    for a in asset_properties.index:
+        if not ((value_by_date[a].nunique() == 1) and (value_by_date[a].sum() == 0)):
+            # only plot traces with at least one non-zero value
+            fig.add_trace(go.Bar(x=value_by_date.index, y=value_by_date[a], name=a, customdata=np.dstack(value_by_date_cumulative[a]), marker=dict(color=asset_properties.loc[a, 'color']),
+                hovertemplate =
+                    "<b>%{name}</b><br>" +
+                    "%{x|%B %Y}<br>" + label_text +
+                    ": %{y:.2f}€<br>Total return received: %{customdata[0]}<extra></extra>"))
+
+    fig.update_yaxes(ticksuffix="€")
+    fig.update_layout(yaxis2=dict(
+        title="",
+        titlefont=dict(
+            color="cyan"
+        ),
+        tickfont=dict(
+            color="cyan"
+        ),
+        ticksuffix="€",
+        side='right', overlaying='y',
+        range=[0, max(value_by_date_sum.values) * 1.05], fixedrange=True
+    ), legend=dict(x=1.07))
+    fig.update_layout(barmode='group')
+    six_months = [value_by_date.index[-1] - datetime.timedelta(days=(365/2 - 15)), value_by_date.index[-1] + datetime.timedelta(days=15)]
+    fig.update_xaxes(range=six_months)
+    configure_historical_dataview(fig, latest_date - value_by_date.index[0])
 
     return fig
 
@@ -329,7 +374,7 @@ def plot_historical_relative_profit(dataframe: pd.DataFrame) -> go.Figure:
     six_months = [value_by_date.index[-1] - datetime.timedelta(days=(365/2 - 15)), value_by_date.index[-1] + datetime.timedelta(days=15)]
     fig.update_xaxes(range=six_months)
     fig.update_yaxes(ticksuffix="%")
-    configure_historical_dataview(fig)
+    configure_historical_dataview(fig, latest_date - value_by_date.index[0])
 
     return fig
 
@@ -387,7 +432,7 @@ def plot_historical_asset_data(input: pd.DataFrame) -> go.Figure:
 
     fig.update_layout(hovermode='x', showlegend=False)
     fig.update_layout(hoverlabel=dict(bgcolor='white'))
-    configure_historical_dataview(fig)
+    configure_historical_dataview(fig, latest_date - input.loc[input.index[0],'date'])
     one_year = [latest_date - datetime.timedelta(days=365), latest_date]
     fig.update_xaxes(range=one_year, rangeslider=dict(visible=True))
     fig.update_yaxes(ticksuffix='€')
@@ -434,14 +479,23 @@ def plot_yearly_asset_data(data: pd.DataFrame) -> go.Figure:
 
     return fig
 
-def configure_historical_dataview(figure: go.Figure):
+def configure_historical_dataview(figure: go.Figure, time_range: datetime.timedelta):
+    # buttons, that are always present
+    buttons = [dict(count=6, label='6M', step='month', stepmode='backward'),
+        dict(count=1, label='YTD', step='year', stepmode='todate'),
+        dict(count=1, label='1Y', step='year', stepmode='backward')]
+
+    # adding buttons depending on input time range
+    years = [1, 2, 5, 10, 20, 50, 100]
+    for i in range(1, len(years)):
+        if time_range.days > years[i-1] * 365:
+            buttons.append(dict(count=years[i], label='{:d}Y'.format(years[i]),
+                step='year', stepmode='backward'))
+
+    buttons.append(dict(label="ALL", step="all"))  # ALL is also always available
+
     figure.update_xaxes(type='date', rangeslider_visible=False,
-        rangeselector=dict( x=0, buttons=list([
-            dict(count=6, label="6M", step="month", stepmode="backward"),
-            dict(count=1, label="YTD", step="year", stepmode="todate"),
-            dict(count=1, label="1Y", step="year", stepmode="backward"),
-            dict(count=2, label="3Y", step="year", stepmode="backward"),
-            dict(label="ALL", step="all")])))
+        rangeselector=dict(x=0, buttons=buttons))
     figure.update_layout(margin=dict(l=10, r=10, t=20, b=10))
     figure.update_layout(xaxis=dict(title=dict(text='')), yaxis=dict(title=dict(text='')))
 
@@ -460,6 +514,8 @@ def append_figures(statistic: str, label_text) -> str:
 
     if statistic == 'relative_profit':
         historical = plot_historical_relative_profit(monthly_data)
+    elif statistic == 'return_received':
+        historical = plot_historical_return(monthly_data, statistic, label_text)
     else:
         historical = plot_historical_data(monthly_data, statistic, label_text)
 
@@ -514,9 +570,23 @@ def append_asset_data_tabs(document: dominate.document):
         group_assets = assets.loc[assets['group'] == g, 'name'].unique()
         content = ''
         if len(group_assets) > 1:
-            group_total = assets[assets['group'] == g].groupby('date').sum().reset_index()
-            group_total = process_data(group_total)
+            all_dates = assets[assets['group'] == g].groupby('date').tail(1)['date']
+            group_total = pd.DataFrame(columns=assets.columns).set_index('date').reindex(all_dates).fillna(0.0)
+            group_total[['name', 'symbol', 'group', 'account', 'color']] = 'VOID'
+            #print(group_total)
+            for a in group_assets:
+                asset_data = process_data(assets[assets['name'] == a].set_index('date').reindex(all_dates).reset_index())
+                #asset_data[['name', 'symbol', 'group', 'account', 'color']] = 'VOID'
+                asset_data = asset_data.set_index('date').fillna(0.0)
+                asset_data[['name', 'symbol', 'group', 'account', 'color']] = 'VOID'
+                group_total = group_total.add(asset_data)
+                print("Ass data: ", a)
+                print(asset_data['value'])
+            #print(group_total)
+            #print(group_total['value'])
+            group_total = process_data(group_total.reset_index())
             group_total['name'] = '{} Total'.format(g)
+            #print(group_total['value'])
             content += append_asset_data_view(group_total)
         for a in group_assets:
             content += append_asset_data_view(assets[assets['name'] == a])
