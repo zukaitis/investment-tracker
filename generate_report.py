@@ -127,6 +127,7 @@ def process_data(input_data) -> pd.DataFrame:
         data['return'] = data['return'].fillna(0.0)
     else:
         data['return'] = 0.0
+    data['total_return_received'] = data['return'].cumsum()
 
     if 'amount' in data.columns:
         data['amount'] = pd.to_numeric(data['amount'])
@@ -185,15 +186,11 @@ def calculate_monthly_values(input: pd.DataFrame) -> pd.DataFrame:
 
     return monthly
 
-def plot_sunburst(input: pd.DataFrame,
-        values: str, label_text) -> go.Sunburst:
+def plot_sunburst(input: pd.DataFrame, values: str, label_text: str) -> go.Sunburst:
     dataframe = input.copy()
     dataframe = dataframe.loc[dataframe[values] != 0]  # filter 0 values
     dataframe['rootnode'] = ''
-    if type(label_text) is str:
-        label_text = [label_text, '']
-    dataframe['sign'] = np.where(dataframe[values] > 0,
-        label_text[0], label_text[1])
+    dataframe['profitability'] = np.where(dataframe[values] > 0, 'Profitable', 'Unprofitable')
 
     dataframe['account'] = np.where(dataframe['account'] == ' ',
         dataframe['group'], dataframe['account'])
@@ -204,36 +201,60 @@ def plot_sunburst(input: pd.DataFrame,
     dataframe['group'] = np.where(dataframe[values] < 0,
         dataframe['group'] + ' ', dataframe['group'])
 
-    data = dataframe[['name', 'account', values, 'sign', 'color']].copy()
-    data.columns = ['label', 'parent', 'value', 'sign', 'color']
-    data['value'] = abs(data['value'])
+    dataframe['group_sum'] = 0
+    for g in dataframe['group'].unique():
+        dataframe.loc[dataframe['group'] == g, 'group_sum'] = \
+            dataframe.loc[dataframe['group'] == g, values].sum()
+    dataframe['profitability_sum'] = 0
+    for g in dataframe['profitability'].unique():
+        dataframe.loc[dataframe['profitability'] == g, 'profitability_sum'] = \
+            dataframe.loc[dataframe['profitability'] == g, values].sum()
+
+    data = pd.DataFrame(columns=['label', 'parent', 'value', 'profitability', 'color'])
 
     if dataframe[values].min() < 0:
-        path = ['rootnode', 'sign', 'group', 'account', 'name']
+        path = ['rootnode', 'profitability', 'group', 'account', 'name']
     else:
         path = ['rootnode', 'group', 'account', 'name']
 
-    for i in range(1, len(path) - 1):
+    for i in range(1, len(path)):
         d = dataframe.groupby(path[i]).first().reset_index()
         d[values] = dataframe.groupby(path[i]).sum().reset_index()[values]
-        d['sign'] = np.where(d[values] > 0, label_text[0], label_text[1])
+        d['fraction_in_group'] = d[values] / d['group_sum'] * 100
+        d['fraction_in_profitability'] = d[values] / d['profitability_sum'] * 100
+
+        # creating displayed string from 5 parts, which are formated depending on the values
+        d = d.assign(s1='', s2='', s3='', s4='')
+        if d['fraction_in_profitability'].iloc[0] < 100.0:
+            if d['group'].nunique() > 1:
+                d['s1'] = d['fraction_in_profitability'].map('<br>{:,.0f}%'.format)
+                if dataframe[values].min() < 0:
+                    d['s2'] = ' of ' + d['profitability']
+                    d['s3'] = '<br>'
+                else:
+                    d['s3'] = ' / '
+            else:
+                d['s3'] = np.where(d['fraction_in_group'] < 100, '<br>', '')
+            d['s4'] = np.where(d['fraction_in_group'] < 100,
+                d['fraction_in_group'].map('{:,.0f}% of '.format) + d['group'], '')
+            d['s3'] = np.where(d['fraction_in_group'] < 100, d['s3'], '')
+        d['display_string'] = d[values].map('{:,.2f}€'.format) + d['s1'] + d['s2'] + d['s3'] + d['s4']
+
         d[values] = abs(d[values])
-        d = d[[path[i], path[i-1], values, 'sign', 'color']]
-        d.columns = ['label', 'parent', 'value', 'sign', 'color']
+        d = d[[path[i], path[i-1], values, 'display_string', 'color']]
+        d.columns = ['label', 'parent', 'value', 'display_string', 'color']
         # remove rows, where label matches parent
         d = d.drop(d[d.label == d.parent].index)
         data = data.append(d)
 
-    # Set colors for positive and negative sign labels if they exist
-    data['color'] = np.where(data['label'] == label_text[0],
-        'rgb(0, 255, 0)', data['color'])
-    data['color'] = np.where(data['label'] == label_text[1],
-        'rgb(255, 0, 0)', data['color'])
+    # Set colors of Profitable and Unprofitable labels if they exist
+    data.loc[data['label'] == 'Profitable', 'color'] = 'green'
+    data.loc[data['label'] == 'Unprofitable', 'color'] = 'red'
 
     return go.Sunburst(labels=data['label'], parents=data['parent'],
-        values=data['value'], customdata=data['sign'],
+        values=data['value'], customdata=data['display_string'],
         marker=dict(colors=data['color']), branchvalues='total', hovertemplate=
-            '<b>%{label}</b><br>%{customdata}: %{value:.2f}€<extra></extra>')
+            '<b>%{label}</b><br>' + label_text + ': %{customdata}<extra></extra>')
 
 def plot_relative_profit_sunburst(input: pd.DataFrame) -> go.Sunburst:
     dataframe = input.copy()
@@ -241,7 +262,7 @@ def plot_relative_profit_sunburst(input: pd.DataFrame) -> go.Sunburst:
 
     dataframe = dataframe.loc[dataframe['relative_profit'] != 0]  # filter 0 values
     dataframe = dataframe.loc[dataframe['relative_profit'] != -100]  # filter -100 values (taxes)
-    dataframe['sign'] = np.where(dataframe['relative_profit'] > 0, 'Profit', 'Loss')
+    dataframe['sign'] = np.where(dataframe['relative_profit'] > 0, 'Profitable', 'Unprofitable')
 
     # Manipulating names in order to separate positive and negative values
     dataframe['account'] = np.where(dataframe['account'] == ' ', dataframe['group'], dataframe['account'])
@@ -262,7 +283,7 @@ def plot_relative_profit_sunburst(input: pd.DataFrame) -> go.Sunburst:
     for i in range(1, len(path) - 1):
         d = dataframe.groupby(path[i]).first().reset_index()
         d['relative_profit_sum'] = dataframe.groupby(path[i]).sum().reset_index()['relative_profit_sum']
-        d['sign'] = np.where(d['relative_profit_sum'] > 0, 'Profit', 'Loss')
+        d['sign'] = np.where(d['relative_profit_sum'] > 0, 'Profitable', 'Unprofitable')
         d['relative_profit_sum'] = abs(d['relative_profit_sum'])
         d['relative_profit'] = (dataframe.groupby(path[i]).sum().reset_index()['profit'] / dataframe.groupby(path[i]).sum().reset_index()['net_investment']) * 100
         d = d[[path[i], path[i-1], 'relative_profit', 'relative_profit_sum', 'sign', 'color']]
@@ -271,8 +292,8 @@ def plot_relative_profit_sunburst(input: pd.DataFrame) -> go.Sunburst:
         data = data.append(d)
 
     # Set colors for positive and negative sign labels if they exist
-    data['color'] = np.where(data['label'] == 'Profit', 'rgb(0, 255, 0)', data['color'])
-    data['color'] = np.where(data['label'] == 'Loss', 'rgb(255, 0, 0)', data['color'])
+    data.loc[data['label'] == 'Profitable', 'color'] = 'green'
+    data.loc[data['label'] == 'Unprofitable', 'color'] = 'red'
 
     return go.Sunburst(labels=data['label'], parents=data['parent'], values=data['relative_profit_sum'], customdata=data['relative_profit'], marker=dict(colors=data['color']),
         branchvalues='total', hovertemplate =
@@ -307,15 +328,16 @@ def plot_historical_data(dataframe: pd.DataFrame, values: str, label_text: str) 
 
     return fig
 
-def plot_historical_return(dataframe: pd.DataFrame, values: str, label_text: str) -> go.Figure:
+def plot_historical_return(dataframe: pd.DataFrame, label_text: str) -> go.Figure:
     value_by_date = dataframe.pivot(index='date', columns='name', values='return')
     value_by_date_cumulative = dataframe.pivot(index='date', columns='name',
-        values='return_received')
+        values='total_return_received')
 
     fig = go.Figure()
 
     value_by_date_sum = value_by_date_cumulative.sum(axis = 1, skipna = True)
-    fig.add_trace(go.Scatter(x=value_by_date_sum.index, y=value_by_date_sum.values, mode='lines+markers', name='Total',
+    fig.add_trace(go.Scatter(x=value_by_date_sum.index, y=value_by_date_sum.values,
+        mode='lines+markers', name='Total',
         marker=dict(color=cyan), yaxis='y2', hovertemplate =
             '%{x|%B %Y}<br>' +
             '<b>Total return received:</b> %{y:.2f}€<extra></extra>'))
@@ -323,7 +345,9 @@ def plot_historical_return(dataframe: pd.DataFrame, values: str, label_text: str
     for a in asset_properties.index:
         if not ((value_by_date[a].nunique() == 1) and (value_by_date[a].sum() == 0)):
             # only plot traces with at least one non-zero value
-            fig.add_trace(go.Bar(x=value_by_date.index, y=value_by_date[a], name=a, customdata=np.dstack(value_by_date_cumulative[a]), marker=dict(color=asset_properties.loc[a, 'color']),
+            fig.add_trace(go.Bar(x=value_by_date.index, y=value_by_date[a], name=a,
+                customdata=np.dstack(value_by_date_cumulative[a]),
+                marker=dict(color=asset_properties.loc[a, 'color']),
                 hovertemplate =
                     "<b>%{name}</b><br>" +
                     "%{x|%B %Y}<br>" + label_text +
@@ -499,7 +523,7 @@ def configure_historical_dataview(figure: go.Figure, time_range: datetime.timede
     figure.update_layout(margin=dict(l=10, r=10, t=20, b=10))
     figure.update_layout(xaxis=dict(title=dict(text='')), yaxis=dict(title=dict(text='')))
 
-def append_figures(statistic: str, label_text) -> str:
+def append_figures(statistic: str, label_text: str) -> str:
 
     if statistic == 'relative_profit':
         sunburst = go.Figure(plot_relative_profit_sunburst(current_stats))
@@ -509,13 +533,10 @@ def append_figures(statistic: str, label_text) -> str:
     sunburst = sunburst.update_traces(insidetextorientation='radial')
     sunburst.update_layout(margin=dict(l=10, r=10, t=10, b=10))
 
-    if type(label_text) is list:
-        label_text = label_text[0]
-
     if statistic == 'relative_profit':
         historical = plot_historical_relative_profit(monthly_data)
     elif statistic == 'return_received':
-        historical = plot_historical_return(monthly_data, statistic, label_text)
+        historical = plot_historical_return(monthly_data, label_text)
     else:
         historical = plot_historical_data(monthly_data, statistic, label_text)
 
@@ -555,9 +576,9 @@ def append_overall_data_tabs(document: dominate.document):
         tabs.append(Html.Tab(Html.label('Return received', Html.Value(current_stats['return_received'].sum(), '€')),
             append_figures('return_received', 'Return received')))
     tabs.append(Html.Tab(Html.label('Net profit', Html.Value(current_stats['profit'].sum(), '€').color()),
-        append_figures('profit', ['Profit', 'Loss'])))
+        append_figures('profit', 'Net profit')))
     tabs.append(Html.Tab(Html.label('Relative net profit', Html.Value((current_stats['profit'].sum()/current_stats['net_investment'].sum())*100, '%').color()),
-        append_figures('relative_profit', ['Profit', 'Loss'])))
+        append_figures('relative_profit', 'Relative net profit')))
 
     document += raw(Html.tab_container(tabs))
 
@@ -580,8 +601,8 @@ def append_asset_data_tabs(document: dominate.document):
                 asset_data = asset_data.set_index('date').fillna(0.0)
                 asset_data[['name', 'symbol', 'group', 'account', 'color']] = 'VOID'
                 group_total = group_total.add(asset_data)
-                print("Ass data: ", a)
-                print(asset_data['value'])
+                #print("Ass data: ", a)
+                #print(asset_data['value'])
             #print(group_total)
             #print(group_total['value'])
             group_total = process_data(group_total.reset_index())
