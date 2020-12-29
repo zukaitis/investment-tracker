@@ -113,7 +113,7 @@ def currency() -> str:
 def plotly_currency(variable: str) -> str:
     return '%{' + variable + ':.2f}' + settings.currency
 
-def process_data(input_data) -> pd.DataFrame:
+def process_data(input_data, discard_zero_values: bool = True) -> pd.DataFrame:
     if type(input_data) is pd.DataFrame:
         data = input_data.copy()
     else:
@@ -146,7 +146,7 @@ def process_data(input_data) -> pd.DataFrame:
 
     if 'price' in data.columns:
         data['price'] = pd.to_numeric(data['price'])
-        data['price'] = data['price'].interpolate(method='pad')
+        data['price'] = data['price'].interpolate(method='linear')
     
     if 'value' in data.columns:
         data['value'] = pd.to_numeric(data['value'])
@@ -169,7 +169,9 @@ def process_data(input_data) -> pd.DataFrame:
     data['period'] = np.where(nonzero_after_zero_mask, 1, np.nan)
     data['period'] = data['period'].cumsum().interpolate(method='pad')
     data['period'] = data['period'].fillna(0)
-    data.drop(data[zero_mask].index, inplace=True)
+
+    if discard_zero_values:
+        data.drop(data[zero_mask].index, inplace=True)
 
     data = data.assign(return_received=0, net_investment=0, net_investment_max=0)
     for p in data['period'].unique():
@@ -178,6 +180,7 @@ def process_data(input_data) -> pd.DataFrame:
         data.loc[mask, 'net_investment'] = data.loc[mask, 'investment'].cumsum()
         data.loc[mask, 'net_investment_max'] = data.loc[mask, 'net_investment'].cummax()
 
+    data['total_return_received'] = data['return'].cumsum()
     data['profit'] = data['value'] - data['net_investment'] + data['return_received']
     data['net_investment'] = np.where(data['net_investment'] < 0, 0, data['net_investment'])
     data['relative_profit'] = (data['profit'] / data['net_investment_max']) * 100
@@ -326,10 +329,9 @@ def plot_historical_data(dataframe: pd.DataFrame, values: str, label_text: str) 
         if not ((value_by_date[a].nunique() == 1) and (value_by_date[a].sum() == 0)):
             # only plot traces with at least one non-zero value
             fig.add_trace(go.Bar(x=value_by_date.index, y=value_by_date[a], name=a, customdata=np.dstack(a), marker=dict(color=asset_properties.loc[a, 'color']),
-                hovertemplate =
-                    '<b>%{name}</b><br>' +
-                    '%{x|%B %Y}<br>' + label_text +
-                    ': ' + plotly_currency('y') + '<extra></extra>'))
+                hovertemplate = '%{x|%B %Y}<br>'
+                    + '<b>%{name}</b><br>'
+                    + label_text + ': ' + plotly_currency('y') + '<extra></extra>'))
 
     fig.update_layout(barmode='relative')
     six_months = [value_by_date.index[-1] - datetime.timedelta(days=(365/2 - 15)), value_by_date.index[-1] + datetime.timedelta(days=15)]
@@ -359,9 +361,10 @@ def plot_historical_return(dataframe: pd.DataFrame, label_text: str) -> go.Figur
             fig.add_trace(go.Bar(x=value_by_date.index, y=value_by_date[a], name=a,
                 customdata=np.dstack(value_by_date_cumulative[a]),
                 marker=dict(color=asset_properties.loc[a, 'color']),
-                hovertemplate = ('<b>%{name}</b><br>'
-                    + '%{x|%B %Y}<br>' + label_text + ': ' + plotly_currency('y')
-                    + '<br>Total return received: %{customdata[0]}<extra></extra>')))
+                hovertemplate = '%{x|%B %Y}<br>' 
+                    + '<b>%{name}</b><br>'
+                    + label_text + ': ' + plotly_currency('y')
+                    + '<br>Total return received: %{customdata[0]}<extra></extra>'))
 
     fig.update_yaxes(ticksuffix=settings.currency)
     fig.update_layout(yaxis2=dict(title='',
@@ -391,10 +394,9 @@ def plot_historical_relative_profit(dataframe: pd.DataFrame) -> go.Figure:
     for a in asset_properties.index:
         if a in value_by_date.columns:
             fig.add_trace(go.Bar(x=value_by_date.index, y=value_by_date[a], name=a, customdata=[a], marker=dict(color=asset_properties.loc[a,'color']),
-                hovertemplate =
-                    "<b>%{customdata[0]:s}</b><br>"+
-                    "%{x|%B %Y}<br>"+
-                    "Relative net profit: %{y:.2f}%<extra></extra>"))
+                hovertemplate = '%{x|%B %Y}<br>'
+                    + '<b>%{customdata[0]:s}</b><br>'
+                    + 'Relative net profit: %{y:.2f}%<extra></extra>'))
 
     fig.update_layout(barmode='group')
     six_months = [value_by_date.index[-1] - datetime.timedelta(days=(365/2 - 15)), value_by_date.index[-1] + datetime.timedelta(days=15)]
@@ -473,8 +475,8 @@ def plot_yearly_asset_data(data: pd.DataFrame) -> go.Figure:
     yearly_data['value_change'] = yearly_data['profit'] - yearly_data['return_received']
     yearly_data.loc[yearly_data.index[0], 'value_change'] = 0
     yearly_data['value_change'] = yearly_data['value_change'].diff()
-    yearly_data.loc[yearly_data.index[0], 'return_received'] = 0
-    yearly_data['return_received'] = yearly_data['return_received'].diff()
+    yearly_data.loc[yearly_data.index[0], 'total_return_received'] = 0
+    yearly_data['total_return_received'] = yearly_data['total_return_received'].diff()
     if yearly_data.index[-1] == yearly_data.index[-2]:
         # if two last rows are the same, drop one of them
         yearly_data.drop(yearly_data.tail(1).index, inplace=True)
@@ -484,7 +486,7 @@ def plot_yearly_asset_data(data: pd.DataFrame) -> go.Figure:
     yearly_data.drop(yearly_data.head(1).index, inplace=True)
 
     fig.add_trace(go.Bar(x=yearly_data['date'],
-        y=yearly_data['return_received'], marker=dict(color='rgb(73,200,22)'),
+        y=yearly_data['total_return_received'], marker=dict(color='rgb(73,200,22)'),
         # single column looks ugly otherwise
         width=[0.5] if (len(yearly_data) == 1) else None,
         hovertemplate =
@@ -594,21 +596,16 @@ def append_asset_data_tabs(document: dominate.document):
         if len(group_assets) > 1:
             all_dates = assets[assets['group'] == g].groupby('date').tail(1)['date']
             group_total = pd.DataFrame(columns=assets.columns).set_index('date').reindex(all_dates).fillna(0.0)
-            group_total[['name', 'symbol', 'group', 'account', 'color']] = 'VOID'
-            #print(group_total)
+            group_total[['name', 'symbol', 'group', 'account', 'color']] = ''
             for a in group_assets:
-                asset_data = process_data(assets[assets['name'] == a].set_index('date').reindex(all_dates).reset_index())
-                #asset_data[['name', 'symbol', 'group', 'account', 'color']] = 'VOID'
+                asset_data = process_data(assets[assets['name'] == a].set_index('date').reindex(all_dates).reset_index(), discard_zero_values=False)
                 asset_data = asset_data.set_index('date').fillna(0.0)
-                asset_data[['name', 'symbol', 'group', 'account', 'color']] = 'VOID'
+                asset_data[['name', 'symbol', 'group', 'account', 'color']] = ''
                 group_total = group_total.add(asset_data)
-                #print("Ass data: ", a)
-                #print(asset_data['value'])
-            #print(group_total)
-            #print(group_total['value'])
             group_total = process_data(group_total.reset_index())
             group_total['name'] = '{} Total'.format(g)
-            #print(group_total['value'])
+            group_total['symbol'] = np.NaN
+
             content += append_asset_data_view(group_total)
         for a in group_assets:
             content += append_asset_data_view(assets[assets['name'] == a])
