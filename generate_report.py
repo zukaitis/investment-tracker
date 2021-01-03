@@ -1,5 +1,7 @@
 #!/usr/bin/python3
 
+import html
+
 import os
 import yaml
 import argparse
@@ -8,101 +10,13 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-import dominate
-import dominate.tags as dt
-from dominate.util import raw
 from dataclasses import dataclass
 import dataclasses
 import warnings
 
 cyan = px.colors.qualitative.Plotly[5]
 
-class Html:
-    _tab_container_count = 0
-
-    @dataclass
-    class Tab:
-        label: str = None
-        content: str = None
-        checked: bool = False
-
-    def tab_container(tab: list) -> str:
-        output = '<div class="tab_container">'
-        container_name = 'container{:d}'.format(Html._tab_container_count)
-        width = 100 / len(tab)
-        for i in range(len(tab)):
-            tab_name = container_name + '_tab{:d}'.format(i)
-            output += ('<input id="{}" '.format(tab_name)
-                + 'type="radio" name="{}"'.format(container_name)
-                + (' checked>' if tab[i].checked else '>')
-                + '<label style="width:{:.2f}%" for="{}">'.format(width, tab_name))
-            if tab[i].label != None:
-                output += tab[i].label
-            output += '</label>'
-
-        for i in range(len(tab)):
-            id = container_name + '_content{:d}'.format(i)
-            output += '<section id="{}" class="tab-content">'.format(id)
-            if tab[i].content != None:
-                output += tab[i].content
-            output += '</section>'
-
-        output += '</div>'
-        Html._tab_container_count += 1
-        return output
-
-    @dataclass
-    class Column:
-        content: str = None
-        width: float = None
-
-    def columns(column: list) -> str:
-        output = '<div>'
-        column = Html._fill_width_fields(column)
-        for c in column:
-            output += '<div class="column" style="width:{:.1f}%">'.format(c.width)
-            if c.content != None:
-                output += c.content
-            output += '</div>'
-        output += '</div>'
-        return output
-
-    @dataclass
-    class Value:
-        value: float
-        suffix: str = ''
-        text_color: str = None
-
-        def color(self):
-            if self.value > 0:
-                self.text_color = 'green'
-            elif self.value < 0:
-                self.text_color = 'red'
-            return self
-
-    def label(name: str, value: Value = None) -> str:
-        output = '<span class="label_name">{}</span>'.format(name)
-        if value != None:
-            output += ('<br><span'
-                + (' style=color:{}>'.format(value.text_color) if value.text_color != None else '>')
-                + '{:.2f}{}</span>'.format(value.value, value.suffix))
-        return output
-
-    def _fill_width_fields(column: list) -> list:
-        output = column
-        for i in range(len(output)):
-            output[i] = Html.Column(output[i]) if type(output[i]) is not Html.Column else output[i]
-        remaining_width = 100 - sum([c.width for c in output if c.width != None])
-        floating_column_count = sum([1 for c in output if c.width == None])
-
-        if floating_column_count > 0:
-            width = remaining_width / floating_column_count
-            for c in output:
-                if c.width == None:
-                    c.width = width
-        return output
-
-@dataclass()
+@dataclass
 class Settings:
     owner: str = 'Your'
     currency: str = '€'
@@ -485,6 +399,11 @@ def plot_yearly_asset_data(data: pd.DataFrame) -> go.Figure:
         yearly_data.loc[yearly_data.index[-1], 'date'] += 1
     yearly_data.drop(yearly_data.head(1).index, inplace=True)
 
+    yearly_data['value_change_positive'] = np.where(yearly_data['value_change'] > 0,
+        yearly_data['value_change'], 0)
+    yearly_data['value_change_negative'] = np.where(yearly_data['value_change'] < 0,
+        yearly_data['value_change'], 0)
+
     fig.add_trace(go.Bar(x=yearly_data['date'],
         y=yearly_data['total_return_received'], marker=dict(color='rgb(73,200,22)'),
         # single column looks ugly otherwise
@@ -492,8 +411,14 @@ def plot_yearly_asset_data(data: pd.DataFrame) -> go.Figure:
         hovertemplate =
             '<b>%{x}</b><br>' +
             'Return received: ' + plotly_currency('y') + '<extra></extra>'))
-    fig.add_trace(go.Bar(x=yearly_data['date'], y=yearly_data['value_change'],
-        marker=dict(color='rgb(36,99,139)'),
+    fig.add_trace(go.Bar(x=yearly_data['date'], y=yearly_data['value_change_positive'],
+        marker=dict(color='rgba(0, 255, 0, 0.7)'),
+        width=[0.5] if (len(yearly_data) == 1) else None,
+        hovertemplate =
+            '<b>%{x}</b><br>' +
+            'Value change: %{y:+.2f}' + settings.currency + '<extra></extra>'))
+    fig.add_trace(go.Bar(x=yearly_data['date'], y=yearly_data['value_change_negative'],
+        marker=dict(color='rgba(255, 0, 0, 0.7)'),
         width=[0.5] if (len(yearly_data) == 1) else None,
         hovertemplate =
             '<b>%{x}</b><br>' +
@@ -526,8 +451,7 @@ def configure_historical_dataview(figure: go.Figure, time_range: datetime.timede
     figure.update_layout(margin=dict(l=10, r=10, t=20, b=10))
     figure.update_layout(xaxis=dict(title=dict(text='')), yaxis=dict(title=dict(text='')))
 
-def append_figures(statistic: str, label_text: str) -> str:
-
+def append_figures(statistic: str, label_text: str) -> html.Columns:
     if statistic == 'relative_profit':
         sunburst = go.Figure(plot_relative_profit_sunburst(current_stats))
     else:
@@ -543,9 +467,9 @@ def append_figures(statistic: str, label_text: str) -> str:
     else:
         historical = plot_historical_data(monthly_data, statistic, label_text)
 
-    return Html.columns([Html.Column(width=30, content=sunburst.to_html(
+    return html.Columns([html.Column(width=30, content=sunburst.to_html(
             full_html=False, include_plotlyjs=True)),
-        Html.Column(content=historical.to_html(
+        html.Column(content=historical.to_html(
             full_html=False, include_plotlyjs=True))])
 
 def append_asset_data_view(data: pd.DataFrame):
@@ -558,34 +482,33 @@ def append_asset_data_view(data: pd.DataFrame):
         name += '<br>{}'.format(data.loc[data.index[-1], 'account'])
     output = '<h2>' + name + '</h2>'
 
-    statistics = [Html.label('Value', Html.Value(data.loc[data.index[-1], 'value'], settings.currency))]
-    statistics.append(Html.label('Funds invested', Html.Value(data.loc[data.index[-1], 'net_investment'], settings.currency)))
+    statistics = [html.Label('Value', html.Value(data.loc[data.index[-1], 'value'], settings.currency))]
+    statistics.append(html.Label('Funds invested', html.Value(data.loc[data.index[-1], 'net_investment'], settings.currency)))
     if data.loc[data.index[-1], 'return_received'] != 0:
-        statistics.append(Html.label('Return received', Html.Value(data.loc[data.index[-1], 'return_received'], settings.currency)))
-    statistics.append(Html.label('Net profit', Html.Value(data.loc[data.index[-1], 'profit'], settings.currency).color()))
-    statistics.append(Html.label('Relative net profit', Html.Value(data.loc[data.index[-1], 'relative_profit'], '%').color()))
-    output += Html.columns(statistics)
+        statistics.append(html.Label('Return received', html.Value(data.loc[data.index[-1], 'return_received'], settings.currency)))
+    statistics.append(html.Label('Net profit', html.Value(data.loc[data.index[-1], 'profit'], settings.currency).color()))
+    statistics.append(html.Label('Relative net profit', html.Value(data.loc[data.index[-1], 'relative_profit'], '%').color()))
+    output += f'{html.Columns(statistics)}'
     if (len(data) > 1):
-        output += Html.columns([Html.Column(width=30, content=plot_yearly_asset_data(data).to_html(full_html=False, include_plotlyjs=True)),
-            Html.Column(content=plot_historical_asset_data(data).to_html(full_html=False, include_plotlyjs=True))])
+        output += f'{html.Columns([html.Column(width=30, content=plot_yearly_asset_data(data).to_html(full_html=False, include_plotlyjs=True)), html.Column(content=plot_historical_asset_data(data).to_html(full_html=False, include_plotlyjs=True))])}'
     return output
 
-def append_overall_data_tabs(document: dominate.document):
-    tabs = [Html.Tab(Html.label('Value', Html.Value(current_stats['value'].sum(), settings.currency)),
+def append_overall_data_tabs(document: html.Document):
+    tabs = [html.Tab(html.Label('Value', html.Value(current_stats['value'].sum(), settings.currency)),
         append_figures('value', 'Value'), checked=True)]
-    tabs.append(Html.Tab(Html.label('Funds invested', Html.Value(current_stats['net_investment'].sum(), settings.currency)),
+    tabs.append(html.Tab(html.Label('Funds invested', html.Value(current_stats['net_investment'].sum(), settings.currency)),
         append_figures('net_investment', 'Funds invested')))
-    if current_stats['return_received'].sum() > 0:
-        tabs.append(Html.Tab(Html.label('Return received', Html.Value(current_stats['return_received'].sum(), settings.currency)),
+    if current_stats['return_received'].max() > 0:
+        tabs.append(html.Tab(html.Label('Return received', html.Value(current_stats['return_received'].sum(), settings.currency)),
             append_figures('return_received', 'Return received')))
-    tabs.append(Html.Tab(Html.label('Net profit', Html.Value(current_stats['profit'].sum(), settings.currency).color()),
+    tabs.append(html.Tab(html.Label('Net profit', html.Value(current_stats['profit'].sum(), settings.currency).color()),
         append_figures('profit', 'Net profit')))
-    tabs.append(Html.Tab(Html.label('Relative net profit', Html.Value((current_stats['profit'].sum()/current_stats['net_investment'].sum())*100, '%').color()),
+    tabs.append(html.Tab(html.Label('Relative net profit', html.Value((current_stats['profit'].sum()/current_stats['net_investment'].sum())*100, '%').color()),
         append_figures('relative_profit', 'Relative net profit')))
 
-    document += raw(Html.tab_container(tabs))
+    document.append(html.TabContainer(tabs))
 
-def append_asset_data_tabs(document: dominate.document):
+def append_asset_data_tabs(document: html.Document):
 
     groups = assets['group'].unique()
 
@@ -609,8 +532,8 @@ def append_asset_data_tabs(document: dominate.document):
             content += append_asset_data_view(group_total)
         for a in group_assets:
             content += append_asset_data_view(assets[assets['name'] == a])
-        tabs.append(Html.Tab(Html.label(g), content))
-    document += raw(Html.tab_container(tabs))
+        tabs.append(html.Tab(html.Label(g), content))
+    document.append(html.TabContainer(tabs))
 
 if __name__ == '__main__':
     # making warnings not show source, since it's irrelevant
@@ -674,21 +597,20 @@ if __name__ == '__main__':
 
     monthly_data = calculate_monthly_values(assets)
 
-    d = dominate.document()
-    d.head += raw('<meta charset="utf-8"/>')
-    d.head += raw('<link rel="stylesheet" href="style.css">')
-    d.head += raw('<title>Your investment portfolio</title>')
-    d += raw('<h1>' + settings.owner + ' investment portfolio</h1>')
-    d += raw('<h3>Data from ' + earliest_date.strftime('%Y-%m-%d') + ' to '
-        + latest_date.strftime('%Y-%m-%d') + '</h3>')
-    append_overall_data_tabs(d)
-    append_asset_data_tabs(d)
+    title = '{} investment portfolio'.format(settings.owner)
+    report = html.Document(title)
 
-    d += raw('<p class="link">Report generated on ' + datetime.date.today().strftime('%Y-%m-%d')
+    report.append('<h1>{}</h1>'.format(title))
+    report.append('<h3>Data from ' + earliest_date.strftime('%Y-%m-%d') + ' to '
+        + latest_date.strftime('%Y-%m-%d') + '</h3>')
+    append_overall_data_tabs(report)
+    append_asset_data_tabs(report)
+
+    report.append('<p class="link">Report generated on ' + datetime.date.today().strftime('%Y-%m-%d')
         + ', using open source script: '
         + '<a href="https://github.com/zukaitis/investment-tracker/">Investment Tracker</a>'
         + '<br>All charts are displayed using '
         + '<a href="https://plotly.com/python/">Plotly</p>')
 
     with open('report.html', 'w') as f:
-        print(d, file=f)
+        print(report, file=f)
