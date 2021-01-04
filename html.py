@@ -42,21 +42,20 @@ class TabContainer(_HtmlObject):
         global tab_container_count
         self.container_index = tab_container_count
         self.tab_count = len(tab)
-        container_name = 'container{:d}'.format(self.container_index)
+        container_name = f'container{self.container_index}'
         width = 100 / self.tab_count
         for i in range(self.tab_count):
-            tab_name = container_name + '_tab{:d}'.format(i)
-            self._raw += ('<input id="{}" '.format(tab_name)
-                + 'type="radio" name="{}"'.format(container_name)
-                + (' checked>' if tab[i].checked else '>')
-                + '<label style="width:{:.2f}%" for="{}">'.format(width, tab_name))
+            tab_name = f'{container_name}_tab{i}'
+            self._raw += f'<input id="{tab_name}" type="radio" name="{container_name}"'
+            self._raw += f' checked>' if tab[i].checked else f'>'
+            self._raw += f'<label style="width:{width:.2f}%" for="{tab_name}">'
             if tab[i].label != None:
                 self._raw += str(tab[i].label)
             self._raw += '</label>'
 
         for i in range(self.tab_count):
-            id = container_name + '_content{:d}'.format(i)
-            self._raw += '<section id="{}" class="tab-content">'.format(id)
+            id = f'{container_name}_content{i}'
+            self._raw += f'<section id="{id}" class="tab-content">'
             if tab[i].content != None:
                 self._raw += str(tab[i].content)
             self._raw += '</section>'
@@ -74,7 +73,7 @@ class Columns(_HtmlObject):
         self._raw = '<div>'
         column = self._fill_width_fields(column)
         for c in column:
-            self._raw += '<div class="column" style="width:{:.1f}%">'.format(c.width)
+            self._raw += f'<div class="column" style="width:{c.width:.1f}%">'
             if c.content != None:
                 self._raw += str(c.content)
             self._raw += '</div>'
@@ -109,8 +108,8 @@ class Value:
 
 class Label(_HtmlObject):
     def __init__(self, name: str, value: Value = None):
-        self._raw = '<span class="label_name">{}</span>'.format(name)
+        self._raw = f'<span class="label_name">{name}</span>'
         if value != None:
-            self._raw += ('<br><span'
-                + (' style=color:{}>'.format(value.text_color) if value.text_color != None else '>')
-                + '{:.2f}{}</span>'.format(value.value, value.suffix))
+            self._raw += f'<br><span'
+            self._raw += f' style=color:{value.text_color}>' if (value.text_color != None) else '>'
+            self._raw += f'{value.value:.2f}{value.suffix}</span>'
