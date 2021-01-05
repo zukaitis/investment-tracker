@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import html
+import _html as html
 
 import os
 import yaml
@@ -383,21 +383,21 @@ def plot_historical_asset_data(input: pd.DataFrame) -> go.Figure:
 def plot_yearly_asset_data(data: pd.DataFrame) -> go.Figure:
     fig = go.Figure()
 
+    # take earliest value of each year, and append latest value
     yearly_data = data.groupby(data['date'].dt.year).head(1)
     yearly_data = yearly_data.append(data.iloc[-1])
-    yearly_data['date'] = yearly_data['date'].dt.year - 1
     
     yearly_data['value_change'] = yearly_data['profit'] - yearly_data['return_received']
     yearly_data.loc[yearly_data.index[0], 'value_change'] = 0
     yearly_data['value_change'] = yearly_data['value_change'].diff()
     yearly_data.loc[yearly_data.index[0], 'total_return_received'] = 0
     yearly_data['total_return_received'] = yearly_data['total_return_received'].diff()
-    if yearly_data.index[-1] == yearly_data.index[-2]:
-        # if two last rows are the same, drop one of them
-        yearly_data.drop(yearly_data.tail(1).index, inplace=True)
-    else:
-        # otherwise, set back year of last row
-        yearly_data.loc[yearly_data.index[-1], 'date'] += 1
+
+    # subtract one year from each date, since these lines are going to represent value change,
+    # which occured during previous year
+    yearly_data['date'] = yearly_data['date'].dt.year - 1
+    if yearly_data.index[-1] != yearly_data.index[-2]:
+        yearly_data.loc[yearly_data.index[-1], 'date'] += 1  # set back year of last row
     yearly_data.drop(yearly_data.head(1).index, inplace=True)
 
     yearly_data['value_change_positive'] = np.where(yearly_data['value_change'] > 0,
