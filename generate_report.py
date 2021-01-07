@@ -10,22 +10,58 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+import yfinance as yf
 from dataclasses import dataclass
 import dataclasses
 import warnings
+# import babel.numbers
 
 cyan = px.colors.qualitative.Plotly[5]
 
 @dataclass
 class Settings:
     owner: str = 'Your'
-    currency: str = '€'
+    currency_symbol: str = '€'
+    currency: str = 'EUR'
+    autofill_interval: str = '1d'
+    autofill_price_mark: str = 'Open'
 
 def currency() -> str:
-    return f'{{:.2f}}{settings.currency}'
+    return f'{{:.2f}}{settings.currency_symbol}'
 
 def plotly_currency(variable: str) -> str:
-    return f'%{{{variable}:.2f}}{settings.currency}'
+    return f'%{{{variable}:.2f}}{settings.currency_symbol}'
+
+def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
+    data = input_data.copy()
+
+    ticker = yf.Ticker(input_data.loc[input_data.index[0], 'symbol'])
+    # download extra data, just to be sure, that the requred date will appear on yf dataframe
+    start_date = input_data.loc[input_data.index[0], 'date'] - datetime.timedelta(days=7)  
+    yfdata = ticker.history(start=start_date, interval=settings.autofill_interval)
+    if ticker.info['currency'] != settings.currency:
+        # convert currency, if it differs from the one selected in settings
+        currency_ticker = yf.Ticker(f"{settings.currency}{ticker.info['currency']}=X")
+        currency_rate = currency_ticker.history(start=start_date,
+            interval=settings.autofill_interval)
+        yfdata[settings.autofill_price_mark] *= currency_rate[settings.autofill_price_mark]
+        yfdata['Dividends'] *= currency_rate[settings.autofill_price_mark]
+
+    yfdata = yfdata.reset_index().rename(columns={'Date':'date',
+        settings.autofill_price_mark:'price'})
+
+    data = pd.merge(data, yfdata, on='date', how='outer').sort_values(by=['date'])
+
+    for p in ['name', 'symbol', 'group']:
+        if p in data.columns:
+            data[p] = input_data.loc[input_data.index[0], p]
+
+    data['amount'] = pd.to_numeric(data['amount']).interpolate(method='pad').fillna(0.0)
+    data['investment'] = pd.to_numeric(data['investment']).fillna(0.0)
+    data['value'] = data['amount'] * data['price']
+    data['return'] = data['amount'] * data['Dividends']
+
+    return data
 
 def process_data(input_data, discard_zero_values: bool = True) -> pd.DataFrame:
     if type(input_data) is pd.DataFrame:
@@ -42,41 +78,45 @@ def process_data(input_data, discard_zero_values: bool = True) -> pd.DataFrame:
         data.drop_duplicates(subset=['date'], inplace=True)
     data.sort_values(by=['date'], inplace=True)
 
-    if 'investment' in data.columns:
-        data['investment'] = pd.to_numeric(data['investment'])
-        data['investment'] = data['investment'].fillna(0.0)
-    else:
-        data['investment'] = 0.0
-
-    if 'return' in data.columns:
-        data['return'] = pd.to_numeric(data['return'])
-        data['return'] = data['return'].fillna(0.0)
-    else:
-        data['return'] = 0.0
-
-    if 'amount' in data.columns:
-        data['amount'] = pd.to_numeric(data['amount'])
-        data['amount'] = data['amount'].interpolate(method='pad')
-
-    if 'price' in data.columns:
-        data['price'] = pd.to_numeric(data['price'])
-        data['price'] = data['price'].interpolate(method='linear')
-    
-    if 'value' in data.columns:
-        data['value'] = pd.to_numeric(data['value'])
-
-    if ('amount' in data.columns) and ('price' in data.columns):
-        if 'value' in data.columns:
-            data['value'] = np.where(pd.notna(data['value']),
-                data['value'], data['amount'] * data['price'])
+    if (('investment' in data.columns) and ('amount' in data.columns) and 
+        ('price' not in data.columns) and ('value' not in data.columns)):
+        data = autofill(data)
+    else:  # process data the old way. TODO: move this to separate method
+        if 'investment' in data.columns:
+            data['investment'] = pd.to_numeric(data['investment'])
+            data['investment'] = data['investment'].fillna(0.0)
         else:
-            data['value'] = data['amount'] * data['price']
+            data['investment'] = 0.0
 
-    if 'value' in data.columns:
-        data['value'] = data['value'].interpolate(method='linear')
-    else:
-        data['value'] = 0.0
-    data['value'] = data['value'].fillna(0.0)
+        if 'return' in data.columns:
+            data['return'] = pd.to_numeric(data['return'])
+            data['return'] = data['return'].fillna(0.0)
+        else:
+            data['return'] = 0.0
+
+        if 'amount' in data.columns:
+            data['amount'] = pd.to_numeric(data['amount'])
+            data['amount'] = data['amount'].interpolate(method='pad')
+
+        if 'price' in data.columns:
+            data['price'] = pd.to_numeric(data['price'])
+            data['price'] = data['price'].interpolate(method='linear')
+        
+        if 'value' in data.columns:
+            data['value'] = pd.to_numeric(data['value'])
+
+        if ('amount' in data.columns) and ('price' in data.columns):
+            if 'value' in data.columns:
+                data['value'] = np.where(pd.notna(data['value']),
+                    data['value'], data['amount'] * data['price'])
+            else:
+                data['value'] = data['amount'] * data['price']
+
+        if 'value' in data.columns:
+            data['value'] = data['value'].interpolate(method='linear')
+        else:
+            data['value'] = 0.0
+        data['value'] = data['value'].fillna(0.0)
 
     nonzero_after_zero_mask = ((data['value'] != 0) & (data['value'].shift(1) == 0))
     zero_mask = (data['value'] == 0) & (data['investment'] == 0)
@@ -252,7 +292,7 @@ def plot_historical_data(dataframe: pd.DataFrame, values: str, label_text: str) 
     fig.update_layout(barmode='relative')
     six_months = [value_by_date.index[-1] - datetime.timedelta(days=(365/2 - 15)), value_by_date.index[-1] + datetime.timedelta(days=15)]
     fig.update_xaxes(range=six_months)
-    fig.update_yaxes(ticksuffix=settings.currency)
+    fig.update_yaxes(ticksuffix=settings.currency_symbol)
     configure_historical_dataview(fig, latest_date - value_by_date.index[0])
 
     return fig
@@ -281,10 +321,10 @@ def plot_historical_return(dataframe: pd.DataFrame, label_text: str) -> go.Figur
                     f'{label_text}: {plotly_currency("y")}<br>'
                     f'Total return received: %{{customdata[0]}}<extra></extra>')))
 
-    fig.update_yaxes(ticksuffix=settings.currency)
+    fig.update_yaxes(ticksuffix=settings.currency_symbol)
     fig.update_layout(yaxis2=dict(title='',
         titlefont=dict(color='cyan'), tickfont=dict(color='cyan'),
-        ticksuffix=settings.currency, side='right', overlaying='y',
+        ticksuffix=settings.currency_symbol, side='right', overlaying='y',
         range=[0, max(value_by_date_sum.values) * 1.05], fixedrange=True),legend=dict(x=1.07))
     fig.update_layout(barmode='group')
     six_months = [value_by_date.index[-1] - datetime.timedelta(days=(365/2 - 15)), value_by_date.index[-1] + datetime.timedelta(days=15)]
@@ -377,7 +417,7 @@ def plot_historical_asset_data(input: pd.DataFrame) -> go.Figure:
     configure_historical_dataview(fig, latest_date - input.loc[input.index[0],'date'])
     one_year = [latest_date - datetime.timedelta(days=365), latest_date]
     fig.update_xaxes(range=one_year, rangeslider=dict(visible=True))
-    fig.update_yaxes(ticksuffix=settings.currency)
+    fig.update_yaxes(ticksuffix=settings.currency_symbol)
     return fig
 
 def plot_yearly_asset_data(data: pd.DataFrame) -> go.Figure:
@@ -415,7 +455,7 @@ def plot_yearly_asset_data(data: pd.DataFrame) -> go.Figure:
 
     hovertemplate = (
         f'<b>%{{x}}</b><br>'
-        f'Value change: %{{y:+.2f}}{settings.currency}<extra></extra>')
+        f'Value change: %{{y:+.2f}}{settings.currency_symbol}<extra></extra>')
     fig.add_trace(go.Bar(x=yearly_data['date'], y=yearly_data['value_change_positive'],
         marker=dict(color='rgba(0, 255, 0, 0.7)'), width=bar_width,
         hovertemplate=hovertemplate))
@@ -425,7 +465,7 @@ def plot_yearly_asset_data(data: pd.DataFrame) -> go.Figure:
 
     fig.update_layout(barmode='relative', showlegend=False)
     fig.update_xaxes(type='category', fixedrange=True)
-    fig.update_yaxes(ticksuffix=settings.currency, fixedrange=True)
+    fig.update_yaxes(ticksuffix=settings.currency_symbol, fixedrange=True)
     fig.update_layout(margin=dict(l=10, r=10, t=35, b=10))
 
     return fig
@@ -481,11 +521,11 @@ def append_asset_data_view(data: pd.DataFrame):
         name += f"<br>{data.loc[data.index[-1], 'account']}"
     output = f'<h2>{name}</h2>'
 
-    statistics = [html.Label('Value', html.Value(data.loc[data.index[-1], 'value'], settings.currency))]
-    statistics.append(html.Label('Funds invested', html.Value(data.loc[data.index[-1], 'net_investment'], settings.currency)))
+    statistics = [html.Label('Value', html.Value(data.loc[data.index[-1], 'value'], settings.currency_symbol))]
+    statistics.append(html.Label('Funds invested', html.Value(data.loc[data.index[-1], 'net_investment'], settings.currency_symbol)))
     if data.loc[data.index[-1], 'return_received'] != 0:
-        statistics.append(html.Label('Return received', html.Value(data.loc[data.index[-1], 'return_received'], settings.currency)))
-    statistics.append(html.Label('Net profit', html.Value(data.loc[data.index[-1], 'profit'], settings.currency).color()))
+        statistics.append(html.Label('Return received', html.Value(data.loc[data.index[-1], 'return_received'], settings.currency_symbol)))
+    statistics.append(html.Label('Net profit', html.Value(data.loc[data.index[-1], 'profit'], settings.currency_symbol).color()))
     statistics.append(html.Label('Relative net profit', html.Value(data.loc[data.index[-1], 'relative_profit'], '%').color()))
     output += f'{html.Columns(statistics)}'
     if (len(data) > 1):
@@ -493,14 +533,14 @@ def append_asset_data_view(data: pd.DataFrame):
     return output
 
 def append_overall_data_tabs(document: html.Document):
-    tabs = [html.Tab(html.Label('Value', html.Value(current_stats['value'].sum(), settings.currency)),
+    tabs = [html.Tab(html.Label('Value', html.Value(current_stats['value'].sum(), settings.currency_symbol)),
         append_figures('value', 'Value'), checked=True)]
-    tabs.append(html.Tab(html.Label('Funds invested', html.Value(current_stats['net_investment'].sum(), settings.currency)),
+    tabs.append(html.Tab(html.Label('Funds invested', html.Value(current_stats['net_investment'].sum(), settings.currency_symbol)),
         append_figures('net_investment', 'Funds invested')))
     if current_stats['return_received'].max() > 0:
-        tabs.append(html.Tab(html.Label('Return received', html.Value(current_stats['return_received'].sum(), settings.currency)),
+        tabs.append(html.Tab(html.Label('Return received', html.Value(current_stats['return_received'].sum(), settings.currency_symbol)),
             append_figures('return_received', 'Return received')))
-    tabs.append(html.Tab(html.Label('Net profit', html.Value(current_stats['profit'].sum(), settings.currency).color()),
+    tabs.append(html.Tab(html.Label('Net profit', html.Value(current_stats['profit'].sum(), settings.currency_symbol).color()),
         append_figures('profit', 'Net profit')))
     tabs.append(html.Tab(html.Label('Relative net profit', html.Value((current_stats['profit'].sum()/current_stats['net_investment'].sum())*100, '%').color()),
         append_figures('relative_profit', 'Relative net profit')))
