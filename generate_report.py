@@ -14,7 +14,7 @@ import yfinance as yf
 from dataclasses import dataclass
 import dataclasses
 import warnings
-# import babel.numbers
+import babel.numbers
 
 cyan = px.colors.qualitative.Plotly[5]
 
@@ -23,11 +23,12 @@ class Settings:
     owner: str = 'Your'
     currency_symbol: str = '€'
     currency: str = 'EUR'
+    locale: str = 'en_US_POSIX'
     autofill_interval: str = '1d'
     autofill_price_mark: str = 'Open'
 
-def currency() -> str:
-    return f'{{:.2f}}{settings.currency_symbol}'
+def currency_str(value: float) -> str:
+    return babel.numbers.format_currency(value, settings.currency, locale=settings.locale)
 
 def plotly_currency(variable: str) -> str:
     return f'%{{{variable}:.2f}}{settings.currency_symbol}'
@@ -58,8 +59,8 @@ def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
 
     data['amount'] = pd.to_numeric(data['amount']).interpolate(method='pad').fillna(0.0)
     data['investment'] = pd.to_numeric(data['investment']).fillna(0.0)
-    data['value'] = data['amount'] * data['price']
-    data['return'] = data['amount'] * data['Dividends']
+    data['value'] = data['amount'] * data['price'].interpolate(method='pad')
+    data['return'] = data['amount'] * data['Dividends'].fillna(0.0)
 
     return data
 
@@ -206,7 +207,7 @@ def plot_sunburst(input: pd.DataFrame, values: str, label_text: str) -> go.Sunbu
             d['s4'] = np.where(d['fraction_in_group'] < 100,
                 d['fraction_in_group'].map('{:.0f}% of '.format) + d['group'], '')
             d['s3'] = np.where(d['fraction_in_group'] < 100, d['s3'], '')
-        d['display_string'] = d[values].map(currency().format) + d['s1'] + d['s2'] + d['s3'] + d['s4']
+        d['display_string'] = d[values].apply(currency_str) + d['s1'] + d['s2'] + d['s3'] + d['s4']
 
         d[values] = abs(d[values])
         d = d[[path[i], path[i-1], values, 'display_string', 'color']]
@@ -300,7 +301,7 @@ def plot_historical_data(dataframe: pd.DataFrame, values: str, label_text: str) 
 def plot_historical_return(dataframe: pd.DataFrame, label_text: str) -> go.Figure:
     value_by_date = dataframe.pivot(index='date', columns='name', values='return')
     value_by_date_cumulative = dataframe.pivot(index='date', columns='name',
-        values='return_received')
+        values='total_return_received')
 
     fig = go.Figure()
 
@@ -314,12 +315,12 @@ def plot_historical_return(dataframe: pd.DataFrame, label_text: str) -> go.Figur
         if not ((value_by_date[a].nunique() == 1) and (value_by_date[a].sum() == 0)):
             # only plot traces with at least one non-zero value
             fig.add_trace(go.Bar(x=value_by_date.index, y=value_by_date[a], name=a,
-                customdata=np.dstack(value_by_date_cumulative[a]),
+                customdata=np.transpose(value_by_date_cumulative[a]),
                 marker=dict(color=asset_properties.loc[a, 'color']), hovertemplate=(
                     f'%{{x|%B %Y}}<br>' 
                     f'<b>{a}</b><br>'
                     f'{label_text}: {plotly_currency("y")}<br>'
-                    f'Total return received: %{{customdata[0]}}<extra></extra>')))
+                    f'Total return received: %{{customdata}}<extra></extra>')))
 
     fig.update_yaxes(ticksuffix=settings.currency_symbol)
     fig.update_layout(yaxis2=dict(title='',
@@ -377,7 +378,7 @@ def plot_historical_asset_data(input: pd.DataFrame) -> go.Figure:
             mode='none', fillcolor='rgba(255,0,0,0.7)', hoverinfo='skip'))
         fig.add_trace(go.Scatter(x=data['date'], y=data['net_investment'], mode='none',
             hovertemplate = 'Net investment: ' + plotly_currency('y') + '<extra></extra>'))
-        data['f_profit'] = data['profit'].map((currency() + ' / ').format)
+        data['f_profit'] = data['profit'].apply(currency_str) + ' / '
         data['f_relative_profit'] = data['relative_profit'].map('{:.2f}%'.format)
         data['profit_string'] = data['f_profit'] + data['f_relative_profit']
         

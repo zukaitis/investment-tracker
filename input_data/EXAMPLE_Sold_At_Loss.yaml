@@ -1,33 +1,8 @@
 ---
-name: Sold At Loss, Inc
-symbol: SALS
+name: Sold At Loss
+symbol: MMM
 account: Local Bank
 group: Stocks
 data:
-  - { date: 2018-08, investment: +570.40, amount: 200, price: 2.85 }
-  - { date: 2018-09, price: 2.62 }
-  - { date: 2018-10, price: 2.64 }
-  - { date: 2018-11, price: 2.46 }
-  - { date: 2018-12, price: 2.36 }
-  - { date: 2019-01, price: 2.3 }
-  - { date: 2019-02, price: 2.52 }
-  - { date: 2019-03, price: 2.57 }
-  - { date: 2019-04, price: 2.54 }
-  - { date: 2019-05, price: 2.81, return: 16 }
-  - { date: 2019-06, price: 2.73 }
-  - { date: 2019-07, price: 2.3 }
-  - { date: 2019-08, price: 2.33, return: 16 }
-  - { date: 2019-09, price: 2.19, return: 16 }
-  - { date: 2019-10, price: 2.23 }
-  - { date: 2019-11, price: 2.22 }
-  - { date: 2019-12, price: 2.15 }
-  - { date: 2020-01, price: 2.23 }
-  - { date: 2020-02, price: 2.22 }
-  - { date: 2020-03, price: 2.05 }
-  - { date: 2020-04, price: 1.385 }
-  - { date: 2020-05, price: 1.93 }
-  - { date: 2020-06, price: 1.75 }
-  - { date: 2020-07, price: 1.64 }
-  - { date: 2020-08, price: 1.6 }
-  - { date: 2020-09, investment: -200, amount: 61, price: 1.44 }
-  - { date: 2020-10, investment: -85.4, value: 0 }
+  - { date: 2017-12, investment: +480, amount: 2 }
+  - { date: 2020-02, investment: -290, amount: 0 }

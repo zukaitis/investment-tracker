@@ -1,7 +1,7 @@
 ---
 # right now there are only 2 settings
 owner: Example
-currency: EUR
+currency: USD
 
 # non existant settings don't crash the generator
 non-existant-setting: Whatever

@@ -1,34 +1,9 @@
 ---
-name: Sold At Profit, Inc
-symbol: SAPR
+name: Sold At Profit
+symbol: MSFT
 account: Local Bank
 group: Stocks
 data:
-  - { date: 2018-08, investment: +500, amount: 450, price: 1.125 }
-  - { date: 2018-09, price: 1.105 }
-  - { date: 2018-10, price: 1.115 }
-  - { date: 2018-11, price: 1.105 }
-  - { date: 2018-12, price: 1.115 }
-  - { date: 2019-01, price: 1.105 }
-  - { date: 2019-02, price: 1.14 }
-  - { date: 2019-03, price: 1.14 }
-  - { date: 2019-04, price: 1.15 }
-  - { date: 2019-05, price: 1.22, return: 30.20 }
-  - { date: 2019-06, price: 1.135 }
-  - { date: 2019-07, price: 1.12 }
-  - { date: 2019-08, price: 1.17 }
-  - { date: 2019-09, price: 1.18 }
-  - { date: 2019-10, price: 1.175 }
-  - { date: 2019-11, price: 1.21 }
-  - { date: 2019-12, price: 1.265 }
-  - { date: 2019-12, price: 1.275 } # duplicate value
-  - { date: 2020-01, price: 1.285 }
-  - { date: 2020-02, price: 1.33 }
-  - { date: 2020-03, price: 1.27 }
-  - { date: 2020-04, price: 1.23 }
-  - { date: 2020-05, price: 1.39, return: 42.47 }
-  - { date: 2020-06, price: 1.395 }
-  - { date: 2020-07, price: 1.395 }
-  - { date: 2020-08, price: 1.55 }
-  - { date: 2020-09, price: 1.595 }
-  - { date: 2020-10, investment: -780, price: 1.56, value: 0 }
+  - { date: 2020-10-20, investment: -420, amount: 0 }
+  - { date: 2020-03, investment: +330, amount: 2.959 }
+
