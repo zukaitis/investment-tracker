@@ -21,17 +21,42 @@ cyan = px.colors.qualitative.Plotly[5]
 @dataclass
 class Settings:
     owner: str = 'Your'
-    currency_symbol: str = '€'
     currency: str = 'EUR'
     locale: str = 'en_US_POSIX'
     autofill_interval: str = '1d'
     autofill_price_mark: str = 'Open'
 
 def currency_str(value: float) -> str:
+    if pd.isna(value):
+        return ''
     return babel.numbers.format_currency(value, settings.currency, locale=settings.locale)
 
-def plotly_currency(variable: str) -> str:
-    return f'%{{{variable}:.2f}}{settings.currency_symbol}'
+def percentage_str(value: float) -> str:
+    return babel.numbers.format_percent(round(value, 4), locale=settings.locale,
+        decimal_quantization=False)
+
+def currency_symbol() -> str:
+    return babel.numbers.get_currency_symbol(settings.currency, locale=settings.locale)
+
+def currency_tick_prefix() -> str:
+    if babel.numbers.Locale.parse(
+            settings.locale).currency_formats['standard'].pattern.startswith('¤'):
+        if babel.numbers.Locale.parse(
+            settings.locale).currency_formats['standard'].pattern.startswith('¤\xa0'):
+            return f'{currency_symbol()} '  # add space after the symbol
+        return f'{currency_symbol()}'
+    else:
+        return None
+
+def currency_tick_suffix() -> str:
+    if babel.numbers.Locale.parse(
+            settings.locale).currency_formats['standard'].pattern.endswith('¤'):
+        if babel.numbers.Locale.parse(
+            settings.locale).currency_formats['standard'].pattern.endswith('\xa0¤'):
+            return f' {currency_symbol()}'  # add space before the symbol
+        return f'{currency_symbol()}'
+    else:
+        return None
 
 def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
     data = input_data.copy()
@@ -138,7 +163,7 @@ def process_data(input_data, discard_zero_values: bool = True) -> pd.DataFrame:
     data['total_return_received'] = data['return'].cumsum()
     data['profit'] = data['value'] - data['net_investment'] + data['return_received']
     data['net_investment'] = np.where(data['net_investment'] < 0, 0, data['net_investment'])
-    data['relative_profit'] = (data['profit'] / data['net_investment_max']) * 100
+    data['relative_profit'] = (data['profit'] / data['net_investment_max'])
 
     return data
 
@@ -189,8 +214,8 @@ def plot_sunburst(input: pd.DataFrame, values: str, label_text: str) -> go.Sunbu
     for i in range(1, len(path)):
         d = dataframe.groupby(path[i]).first().reset_index()
         d[values] = dataframe.groupby(path[i]).sum().reset_index()[values]
-        d['fraction_in_group'] = d[values] / d['group_sum'] * 100
-        d['fraction_in_profitability'] = d[values] / d['profitability_sum'] * 100
+        d['fraction_in_group'] = d[values] / d['group_sum']
+        d['fraction_in_profitability'] = d[values] / d['profitability_sum']
 
         # creating displayed string from 5 parts, which are formated depending on the values
         d = d.assign(s1='', s2='', s3='', s4='')
@@ -254,7 +279,7 @@ def plot_relative_profit_sunburst(input: pd.DataFrame) -> go.Sunburst:
         d['relative_profit_sum'] = dataframe.groupby(path[i]).sum().reset_index()['relative_profit_sum']
         d['sign'] = np.where(d['relative_profit_sum'] > 0, 'Profitable', 'Unprofitable')
         d['relative_profit_sum'] = abs(d['relative_profit_sum'])
-        d['relative_profit'] = (dataframe.groupby(path[i]).sum().reset_index()['profit'] / dataframe.groupby(path[i]).sum().reset_index()['net_investment']) * 100
+        d['relative_profit'] = (dataframe.groupby(path[i]).sum().reset_index()['profit'] / dataframe.groupby(path[i]).sum().reset_index()['net_investment'])
         d = d[[path[i], path[i-1], 'relative_profit', 'relative_profit_sum', 'sign', 'color']]
         d.columns = ['label', 'parent', 'relative_profit', 'relative_profit_sum', 'sign', 'color']
         d = d.drop(d[d.label == d.parent].index)  # remove rows, where label matches parent
@@ -272,28 +297,32 @@ def plot_relative_profit_sunburst(input: pd.DataFrame) -> go.Sunburst:
 
 def plot_historical_data(dataframe: pd.DataFrame, values: str, label_text: str) -> go.Figure:
     value_by_date = dataframe.pivot(index='date', columns='name', values=values)
+    str_value_by_date = value_by_date.applymap(currency_str)
 
     fig = go.Figure()
 
     value_by_date_sum = value_by_date.sum(axis = 1, skipna = True)
+    str_value_by_date_sum = value_by_date_sum.apply(currency_str)
     fig.add_trace(go.Scatter(x=value_by_date_sum.index, y=value_by_date_sum.values,
-        mode='lines+markers', name='Total', marker=dict(color=cyan), hovertemplate=(
+        mode='lines+markers', name='Total', marker=dict(color=cyan),
+        customdata=np.transpose(str_value_by_date_sum.values), hovertemplate=(
             f'%{{x|%B %Y}}<br>'
-            f'<b>Total {label_text.lower()}:</b> {plotly_currency("y")}<extra></extra>')))
+            f'<b>Total {label_text.lower()}:</b> %{{customdata}}<extra></extra>')))
 
     for a in asset_properties.index:
         if not ((value_by_date[a].nunique() == 1) and (value_by_date[a].sum() == 0)):
             # only plot traces with at least one non-zero value
             fig.add_trace(go.Bar(x=value_by_date.index, y=value_by_date[a], name=a,
-                marker=dict(color=asset_properties.loc[a, 'color']), hovertemplate=(
+                marker=dict(color=asset_properties.loc[a, 'color']),
+                customdata=np.transpose(str_value_by_date[a]), hovertemplate=(
                     f'%{{x|%B %Y}}<br>'
                     f'<b>{a}</b><br>'
-                    f'{label_text}: {plotly_currency("y")}<extra></extra>')))
+                    f'{label_text}: %{{customdata}}<extra></extra>')))
 
     fig.update_layout(barmode='relative')
     six_months = [value_by_date.index[-1] - datetime.timedelta(days=(365/2 - 15)), value_by_date.index[-1] + datetime.timedelta(days=15)]
     fig.update_xaxes(range=six_months)
-    fig.update_yaxes(ticksuffix=settings.currency_symbol)
+    fig.update_yaxes(ticksuffix=currency_tick_suffix(), tickprefix=currency_tick_prefix())
     configure_historical_dataview(fig, latest_date - value_by_date.index[0])
 
     return fig
@@ -302,30 +331,34 @@ def plot_historical_return(dataframe: pd.DataFrame, label_text: str) -> go.Figur
     value_by_date = dataframe.pivot(index='date', columns='name', values='return')
     value_by_date_cumulative = dataframe.pivot(index='date', columns='name',
         values='total_return_received')
+    str_value_by_date = value_by_date.applymap(currency_str)
+    str_value_by_date_cumulative = value_by_date_cumulative.applymap(currency_str)
 
     fig = go.Figure()
 
     value_by_date_sum = value_by_date.sum(axis = 1, skipna = True).cumsum()
+    str_value_by_date_sum = value_by_date_sum.apply(currency_str)
     fig.add_trace(go.Scatter(x=value_by_date_sum.index, y=value_by_date_sum.values,
-        mode='lines+markers', name='Total', marker=dict(color=cyan), yaxis='y2', hovertemplate=(
+        mode='lines+markers', name='Total', marker=dict(color=cyan), yaxis='y2',
+        customdata=np.transpose(str_value_by_date_sum.values), hovertemplate=(
             f'%{{x|%B %Y}}<br>'
-            f'<b>Total return received:</b> {plotly_currency("y")}<extra></extra>')))
+            f'<b>Total return received:</b> %{{customdata}}<extra></extra>')))
 
     for a in asset_properties.index:
         if not ((value_by_date[a].nunique() == 1) and (value_by_date[a].sum() == 0)):
             # only plot traces with at least one non-zero value
             fig.add_trace(go.Bar(x=value_by_date.index, y=value_by_date[a], name=a,
-                customdata=np.transpose(value_by_date_cumulative[a]),
+                customdata=np.transpose([str_value_by_date[a], str_value_by_date_cumulative[a]]),
                 marker=dict(color=asset_properties.loc[a, 'color']), hovertemplate=(
                     f'%{{x|%B %Y}}<br>' 
                     f'<b>{a}</b><br>'
-                    f'{label_text}: {plotly_currency("y")}<br>'
-                    f'Total return received: %{{customdata}}<extra></extra>')))
+                    f'{label_text}: %{{customdata[0]}}<br>'
+                    f'Total return received: %{{customdata[1]}}<extra></extra>')))
 
-    fig.update_yaxes(ticksuffix=settings.currency_symbol)
+    fig.update_yaxes(ticksuffix=currency_tick_suffix(), tickprefix=currency_tick_prefix())
     fig.update_layout(yaxis2=dict(title='',
         titlefont=dict(color='cyan'), tickfont=dict(color='cyan'),
-        ticksuffix=settings.currency_symbol, side='right', overlaying='y',
+        ticksuffix=currency_tick_suffix(), tickprefix=currency_tick_prefix(), side='right', overlaying='y',
         range=[0, max(value_by_date_sum.values) * 1.05], fixedrange=True),legend=dict(x=1.07))
     fig.update_layout(barmode='group')
     six_months = [value_by_date.index[-1] - datetime.timedelta(days=(365/2 - 15)), value_by_date.index[-1] + datetime.timedelta(days=15)]
@@ -341,7 +374,7 @@ def plot_historical_relative_profit(dataframe: pd.DataFrame) -> go.Figure:
     fig = go.Figure()
 
     overall = dataframe.groupby('date').sum()[['profit', 'net_investment_max']]
-    overall['values'] = (overall['profit'] / overall['net_investment_max']) * 100
+    overall['values'] = (overall['profit'] / overall['net_investment_max'])
     fig.add_trace(go.Scatter(x=overall.index, y=overall['values'], mode='lines+markers',
         name='Total', marker=dict(color=cyan), hovertemplate=(
             f'%{{x|%B %Y}}<br>'
@@ -374,10 +407,15 @@ def plot_historical_asset_data(input: pd.DataFrame) -> go.Figure:
             data['net_investment'] > data['return_received'],
             data['net_investment'], data['return_received'])
 
+        data['str_net_investment'] = data['net_investment'].apply(currency_str)
+        data['str_return_received'] = data['return_received'].apply(currency_str)
+        data['str_value'] = data['value'].apply(currency_str)
+
         fig.add_trace(go.Scatter(x=data['date'], y=data['red_fill'], fill='tozeroy',
             mode='none', fillcolor='rgba(255,0,0,0.7)', hoverinfo='skip'))
         fig.add_trace(go.Scatter(x=data['date'], y=data['net_investment'], mode='none',
-            hovertemplate = 'Net investment: ' + plotly_currency('y') + '<extra></extra>'))
+            customdata=data['str_net_investment'],
+            hovertemplate=f'Net investment: %{{customdata}}<extra></extra>'))
         data['f_profit'] = data['profit'].apply(currency_str) + ' / '
         data['f_relative_profit'] = data['relative_profit'].map('{:.2f}%'.format)
         data['profit_string'] = data['f_profit'] + data['f_relative_profit']
@@ -390,7 +428,8 @@ def plot_historical_asset_data(input: pd.DataFrame) -> go.Figure:
         if max(data['return_received']) > 0:
             fig.add_trace(go.Scatter(x=data['date'], y=data['return_received'],
                 fill='tozeroy', mode='none', fillcolor='rgba(0,0,0,0)',
-                hovertemplate=f'Return received: {plotly_currency("y")}<extra></extra>'))
+                customdata=data['str_return_received'],
+                hovertemplate=f'Return received: %{{customdata}}<extra></extra>'))
             blue_fill_mode = 'tonexty'
 
         blue_fill = data[['date', 'red_fill', 'value_and_return']].copy()
@@ -410,15 +449,15 @@ def plot_historical_asset_data(input: pd.DataFrame) -> go.Figure:
 
         if max(data['value']) > 0:
             fig.add_trace(go.Scatter(x=data['date'], y=data['value'],
-                mode='lines', line=dict(color='yellow'),
-                hovertemplate=f'Value: {plotly_currency("y")}<extra></extra>'))
+                mode='lines', line=dict(color='yellow'), customdata=data['str_value'],
+                hovertemplate=f'Value: %{{customdata}}<extra></extra>'))
 
     fig.update_layout(hovermode='x', showlegend=False)
     fig.update_layout(hoverlabel=dict(bgcolor='white'))
     configure_historical_dataview(fig, latest_date - input.loc[input.index[0],'date'])
     one_year = [latest_date - datetime.timedelta(days=365), latest_date]
     fig.update_xaxes(range=one_year, rangeslider=dict(visible=True))
-    fig.update_yaxes(ticksuffix=settings.currency_symbol)
+    fig.update_yaxes(ticksuffix=currency_tick_suffix(), tickprefix=currency_tick_prefix())
     return fig
 
 def plot_yearly_asset_data(data: pd.DataFrame) -> go.Figure:
@@ -445,28 +484,36 @@ def plot_yearly_asset_data(data: pd.DataFrame) -> go.Figure:
         yearly_data['value_change'], 0)
     yearly_data['value_change_negative'] = np.where(yearly_data['value_change'] < 0,
         yearly_data['value_change'], 0)
+    yearly_data['str_total_return_received'] = yearly_data['total_return_received'].apply(
+        currency_str)
+    yearly_data['str_value_change_positive'] = '+' + yearly_data['value_change_positive'].apply(
+        currency_str)
+    yearly_data['str_value_change_negative'] = yearly_data['value_change_negative'].apply(
+        currency_str)
 
     bar_width = [0.5] if (len(yearly_data) == 1) else None # single column looks ugly otherwise
 
     fig.add_trace(go.Bar(x=yearly_data['date'],
         y=yearly_data['total_return_received'], marker=dict(color='rgb(73,200,22)'),
-        width=bar_width, hovertemplate=(
+        width=bar_width, customdata=np.transpose(yearly_data['str_total_return_received']),
+        hovertemplate=(
             f'<b>%{{x}}</b><br>'
-            f'Return received: {plotly_currency("y")}<extra></extra>')))
+            f'Return received: %{{customdata}}<extra></extra>')))
 
     hovertemplate = (
         f'<b>%{{x}}</b><br>'
-        f'Value change: %{{y:+.2f}}{settings.currency_symbol}<extra></extra>')
+        f'Value change: %{{customdata}}<extra></extra>')
     fig.add_trace(go.Bar(x=yearly_data['date'], y=yearly_data['value_change_positive'],
-        marker=dict(color='rgba(0, 255, 0, 0.7)'), width=bar_width,
-        hovertemplate=hovertemplate))
+        marker=dict(color='rgba(0, 255, 0, 0.7)'), width=bar_width, hovertemplate=hovertemplate,
+        customdata=np.transpose(yearly_data['str_value_change_positive'])))
     fig.add_trace(go.Bar(x=yearly_data['date'], y=yearly_data['value_change_negative'],
-        marker=dict(color='rgba(255, 0, 0, 0.7)'), width=bar_width,
-        hovertemplate=hovertemplate))
+        marker=dict(color='rgba(255, 0, 0, 0.7)'), width=bar_width, hovertemplate=hovertemplate,
+        customdata=np.transpose(yearly_data['str_value_change_negative'])))
 
     fig.update_layout(barmode='relative', showlegend=False)
     fig.update_xaxes(type='category', fixedrange=True)
-    fig.update_yaxes(ticksuffix=settings.currency_symbol, fixedrange=True)
+    fig.update_yaxes(ticksuffix=currency_tick_suffix(), tickprefix=currency_tick_prefix(),
+        fixedrange=True)
     fig.update_layout(margin=dict(l=10, r=10, t=35, b=10))
 
     return fig
@@ -522,28 +569,28 @@ def append_asset_data_view(data: pd.DataFrame):
         name += f"<br>{data.loc[data.index[-1], 'account']}"
     output = f'<h2>{name}</h2>'
 
-    statistics = [html.Label('Value', html.Value(data.loc[data.index[-1], 'value'], settings.currency_symbol))]
-    statistics.append(html.Label('Funds invested', html.Value(data.loc[data.index[-1], 'net_investment'], settings.currency_symbol)))
+    statistics = [html.Label('Value', html.Value(currency_str(data.loc[data.index[-1], 'value'])))]
+    statistics.append(html.Label('Funds invested', html.Value(currency_str(data.loc[data.index[-1], 'net_investment']))))
     if data.loc[data.index[-1], 'return_received'] != 0:
-        statistics.append(html.Label('Return received', html.Value(data.loc[data.index[-1], 'return_received'], settings.currency_symbol)))
-    statistics.append(html.Label('Net profit', html.Value(data.loc[data.index[-1], 'profit'], settings.currency_symbol).color()))
-    statistics.append(html.Label('Relative net profit', html.Value(data.loc[data.index[-1], 'relative_profit'], '%').color()))
+        statistics.append(html.Label('Return received', html.Value(currency_str(data.loc[data.index[-1], 'return_received']))))
+    statistics.append(html.Label('Net profit', html.Value(currency_str(data.loc[data.index[-1], 'profit'])).color()))
+    statistics.append(html.Label('Relative net profit', html.Value(percentage_str(data.loc[data.index[-1], 'relative_profit'])).color()))
     output += f'{html.Columns(statistics)}'
     if (len(data) > 1):
         output += f'{html.Columns([html.Column(width=30, content=plot_yearly_asset_data(data).to_html(full_html=False, include_plotlyjs=True)), html.Column(content=plot_historical_asset_data(data).to_html(full_html=False, include_plotlyjs=True))])}'
     return output
 
 def append_overall_data_tabs(document: html.Document):
-    tabs = [html.Tab(html.Label('Value', html.Value(current_stats['value'].sum(), settings.currency_symbol)),
+    tabs = [html.Tab(html.Label('Value', html.Value(currency_str(current_stats['value'].sum()))),
         append_figures('value', 'Value'), checked=True)]
-    tabs.append(html.Tab(html.Label('Funds invested', html.Value(current_stats['net_investment'].sum(), settings.currency_symbol)),
+    tabs.append(html.Tab(html.Label('Funds invested', html.Value(currency_str(current_stats['net_investment'].sum()))),
         append_figures('net_investment', 'Funds invested')))
     if current_stats['return_received'].max() > 0:
-        tabs.append(html.Tab(html.Label('Return received', html.Value(current_stats['return_received'].sum(), settings.currency_symbol)),
+        tabs.append(html.Tab(html.Label('Return received', html.Value(currency_str(current_stats['return_received'].sum()))),
             append_figures('return_received', 'Return received')))
-    tabs.append(html.Tab(html.Label('Net profit', html.Value(current_stats['profit'].sum(), settings.currency_symbol).color()),
+    tabs.append(html.Tab(html.Label('Net profit', html.Value(currency_str(current_stats['profit'].sum())).color()),
         append_figures('profit', 'Net profit')))
-    tabs.append(html.Tab(html.Label('Relative net profit', html.Value((current_stats['profit'].sum()/current_stats['net_investment'].sum())*100, '%').color()),
+    tabs.append(html.Tab(html.Label('Relative net profit', html.Value(percentage_str(current_stats['profit'].sum()/current_stats['net_investment'].sum())).color()),
         append_figures('relative_profit', 'Relative net profit')))
 
     document.append(html.TabContainer(tabs))

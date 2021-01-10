@@ -2,6 +2,7 @@
 # right now there are only 2 settings
 owner: Example
 currency: USD
+locale: en_US
 
 # non existant settings don't crash the generator
 non-existant-setting: Whatever

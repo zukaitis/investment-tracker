@@ -95,15 +95,15 @@ class Columns(_HtmlObject):
 
 @dataclass
 class Value:
-    value: float
-    suffix: str = ''
+    value: str = ''
     text_color: str = None
 
     def color(self):
-        if self.value > 0:
-            self.text_color = 'green'
-        elif self.value < 0:
+        if '-' in self.value:
             self.text_color = 'red'
+        # check if there are digits other than 0 in string
+        elif any([str(d) in self.value for d in range(1, 10)]):
+            self.text_color = 'green'
         return self
 
 class Label(_HtmlObject):
@@ -112,4 +112,4 @@ class Label(_HtmlObject):
         if value != None:
             self._raw += f'<br><span'
             self._raw += f' style=color:{value.text_color}>' if (value.text_color != None) else '>'
-            self._raw += f'{value.value:.2f}{value.suffix}</span>'
+            self._raw += f'{value.value}</span>'
