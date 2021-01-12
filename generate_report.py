@@ -35,9 +35,9 @@ def percentage_str(value: float) -> str:
     if np.isnan(value) or np.isinf(value):
         return ''
     precision = 4
-    if value > 0.1:  # 10%
+    if value > 0.5:  # 50%
         precision = 2
-    elif value > 0.01:  # 1%
+    elif value > 0.05:  # 5%
         precision = 3
     return babel.numbers.format_percent(round(value, precision), locale=settings.locale,
         decimal_quantization=False)
@@ -312,6 +312,8 @@ def plot_relative_profit_sunburst(input: pd.DataFrame) -> go.Sunburst:
 
 def plot_historical_data(dataframe: pd.DataFrame, values: str, label_text: str) -> go.Figure:
     value_by_date = dataframe.pivot(index='date', columns='name', values=values)
+    if values != 'profit':
+        value_by_date.interpolate(method='pad', inplace=True)
     str_value_by_date = value_by_date.applymap(currency_str)
 
     fig = go.Figure()
