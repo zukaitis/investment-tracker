@@ -27,12 +27,19 @@ class Settings:
     autofill_price_mark: str = 'Open'
 
 def currency_str(value: float) -> str:
-    if pd.isna(value):
+    if np.isnan(value):
         return ''
     return babel.numbers.format_currency(value, settings.currency, locale=settings.locale)
 
 def percentage_str(value: float) -> str:
-    return babel.numbers.format_percent(round(value, 4), locale=settings.locale,
+    if np.isnan(value) or np.isinf(value):
+        return ''
+    precision = 4
+    if value > 0.1:  # 10%
+        precision = 2
+    elif value > 0.01:  # 1%
+        precision = 3
+    return babel.numbers.format_percent(round(value, precision), locale=settings.locale,
         decimal_quantization=False)
 
 def currency_symbol() -> str:
@@ -57,6 +64,12 @@ def currency_tick_suffix() -> str:
         return f'{currency_symbol()}'
     else:
         return None
+
+def percentage_tick_suffix() -> str:
+    string = percentage_str(777)  # checking generated string of random percentage
+    if string[-2] == ' ':
+        return ' %'
+    return '%'
 
 def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
     data = input_data.copy()
@@ -219,19 +232,19 @@ def plot_sunburst(input: pd.DataFrame, values: str, label_text: str) -> go.Sunbu
 
         # creating displayed string from 5 parts, which are formated depending on the values
         d = d.assign(s1='', s2='', s3='', s4='')
-        if d['fraction_in_profitability'].iloc[0] < 100.0:
+        if d['fraction_in_profitability'].iloc[0] < 1:
             if d['group'].nunique() > 1:
-                d['s1'] = d['fraction_in_profitability'].map('<br>{:.0f}%'.format)
+                d['s1'] = '<br>' + d['fraction_in_profitability'].apply(percentage_str)
                 if dataframe[values].min() < 0:
                     d['s2'] = ' of ' + d['profitability']
                     d['s3'] = '<br>'
                 else:
                     d['s3'] = ' / '
             else:
-                d['s3'] = np.where(d['fraction_in_group'] < 100, '<br>', '')
-            d['s4'] = np.where(d['fraction_in_group'] < 100,
-                d['fraction_in_group'].map('{:.0f}% of '.format) + d['group'], '')
-            d['s3'] = np.where(d['fraction_in_group'] < 100, d['s3'], '')
+                d['s3'] = np.where(d['fraction_in_group'] < 1, '<br>', '')
+            d['s4'] = np.where(d['fraction_in_group'] < 1,
+                d['fraction_in_group'].apply(percentage_str) + ' of ' + d['group'], '')
+            d['s3'] = np.where(d['fraction_in_group'] < 1, d['s3'], '')
         d['display_string'] = d[values].apply(currency_str) + d['s1'] + d['s2'] + d['s3'] + d['s4']
 
         d[values] = abs(d[values])
@@ -248,7 +261,7 @@ def plot_sunburst(input: pd.DataFrame, values: str, label_text: str) -> go.Sunbu
     return go.Sunburst(labels=data['label'], parents=data['parent'],
         values=data['value'], customdata=data['display_string'],
         marker=dict(colors=data['color']), branchvalues='total', hovertemplate=
-            '<b>%{label}</b><br>' + label_text + ': %{customdata}<extra></extra>')
+            f'<b>%{{label}}</b><br>{label_text}: %{{customdata}}<extra></extra>')
 
 def plot_relative_profit_sunburst(input: pd.DataFrame) -> go.Sunburst:
     dataframe = input.copy()
@@ -268,6 +281,7 @@ def plot_relative_profit_sunburst(input: pd.DataFrame) -> go.Sunburst:
     data = dataframe[['name', 'account', 'relative_profit', 'relative_profit_sum', 'sign', 'color']].copy()
     data.columns = ['label', 'parent', 'relative_profit', 'relative_profit_sum', 'sign', 'color']
     data['relative_profit_sum'] = abs(data['relative_profit_sum'])
+    data['str_relative_profit'] = data['relative_profit'].apply(percentage_str)
 
     if dataframe['relative_profit'].min() < 0:
         path = ['rootnode', 'sign', 'group', 'account', 'name']
@@ -280,8 +294,9 @@ def plot_relative_profit_sunburst(input: pd.DataFrame) -> go.Sunburst:
         d['sign'] = np.where(d['relative_profit_sum'] > 0, 'Profitable', 'Unprofitable')
         d['relative_profit_sum'] = abs(d['relative_profit_sum'])
         d['relative_profit'] = (dataframe.groupby(path[i]).sum().reset_index()['profit'] / dataframe.groupby(path[i]).sum().reset_index()['net_investment'])
-        d = d[[path[i], path[i-1], 'relative_profit', 'relative_profit_sum', 'sign', 'color']]
-        d.columns = ['label', 'parent', 'relative_profit', 'relative_profit_sum', 'sign', 'color']
+        d['str_relative_profit'] = d['relative_profit'].apply(percentage_str)
+        d = d[[path[i], path[i-1], 'str_relative_profit', 'relative_profit_sum', 'sign', 'color']]
+        d.columns = ['label', 'parent', 'str_relative_profit', 'relative_profit_sum', 'sign', 'color']
         d = d.drop(d[d.label == d.parent].index)  # remove rows, where label matches parent
         data = data.append(d)
 
@@ -290,10 +305,10 @@ def plot_relative_profit_sunburst(input: pd.DataFrame) -> go.Sunburst:
     data.loc[data['label'] == 'Unprofitable', 'color'] = 'red'
 
     return go.Sunburst(labels=data['label'], parents=data['parent'],
-        values=data['relative_profit_sum'], customdata=data['relative_profit'],
+        values=data['relative_profit_sum'], customdata=data['str_relative_profit'],
         marker=dict(colors=data['color']), branchvalues='total', hovertemplate=(
             f'<b>%{{label}}</b><br>'
-            f'Relative net profit: %{{customdata:.2f}}%<extra></extra>'))
+            f'Relative net profit: %{{customdata}}<extra></extra>'))
 
 def plot_historical_data(dataframe: pd.DataFrame, values: str, label_text: str) -> go.Figure:
     value_by_date = dataframe.pivot(index='date', columns='name', values=values)
@@ -369,30 +384,32 @@ def plot_historical_return(dataframe: pd.DataFrame, label_text: str) -> go.Figur
 
 def plot_historical_relative_profit(dataframe: pd.DataFrame) -> go.Figure:
     value_by_date = dataframe.pivot(index='date', columns='name', values='relative_profit')
-    value_by_date = value_by_date.drop(value_by_date.columns[value_by_date.max() == -100], axis=1)
+    value_by_date = value_by_date.drop(value_by_date.columns[value_by_date.max() == -1], axis=1)
+    str_value_by_date = value_by_date.applymap(percentage_str)
 
     fig = go.Figure()
 
     overall = dataframe.groupby('date').sum()[['profit', 'net_investment_max']]
     overall['values'] = (overall['profit'] / overall['net_investment_max'])
-    fig.add_trace(go.Scatter(x=overall.index, y=overall['values'], mode='lines+markers',
-        name='Total', marker=dict(color=cyan), hovertemplate=(
+    overall['strings'] = overall['values'].apply(percentage_str)
+    fig.add_trace(go.Scatter(x=overall.index, y=overall['values']*100, mode='lines+markers',
+        name='Total', marker=dict(color=cyan), customdata=overall['strings'], hovertemplate=(
             f'%{{x|%B %Y}}<br>'
-            f'<b>Total profit:</b> %{{y:.2f}}%<extra></extra>')))
+            f'<b>Total profit:</b> %{{customdata}}<extra></extra>')))
 
     for a in asset_properties.index:
         if a in value_by_date.columns:
-            fig.add_trace(go.Bar(x=value_by_date.index, y=value_by_date[a], name=a,
+            fig.add_trace(go.Bar(x=value_by_date.index, y=value_by_date[a]*100, name=a,
                 marker=dict(color=asset_properties.loc[a,'color']),
-                hovertemplate=(
+                customdata=np.transpose(str_value_by_date[a]), hovertemplate=(
                     f'%{{x|%B %Y}}<br>'
                     f'<b>{a}</b><br>'
-                    f'Relative net profit: %{{y:.2f}}%<extra></extra>')))
+                    f'Relative net profit: %{{customdata}}<extra></extra>')))
 
     fig.update_layout(barmode='group')
     six_months = [value_by_date.index[-1] - datetime.timedelta(days=(365/2 - 15)), value_by_date.index[-1] + datetime.timedelta(days=15)]
     fig.update_xaxes(range=six_months)
-    fig.update_yaxes(ticksuffix='%')
+    fig.update_yaxes(ticksuffix=percentage_tick_suffix())
     configure_historical_dataview(fig, latest_date - value_by_date.index[0])
 
     return fig
@@ -417,12 +434,12 @@ def plot_historical_asset_data(input: pd.DataFrame) -> go.Figure:
             customdata=data['str_net_investment'],
             hovertemplate=f'Net investment: %{{customdata}}<extra></extra>'))
         data['f_profit'] = data['profit'].apply(currency_str) + ' / '
-        data['f_relative_profit'] = data['relative_profit'].map('{:.2f}%'.format)
+        data['f_relative_profit'] = data['relative_profit'].apply(percentage_str)
         data['profit_string'] = data['f_profit'] + data['f_relative_profit']
         
         fig.add_trace(go.Scatter(x=data['date'], y=data['value_and_return'], fill='tozeroy',
             mode='none', fillcolor='rgba(0,255,0,0.7)', customdata=data['profit_string'],
-            hovertemplate='Net profit: %{customdata}<extra></extra>'))
+            hovertemplate=f'Net profit: %{{customdata}}<extra></extra>'))
 
         blue_fill_mode = 'tozeroy'
         if max(data['return_received']) > 0:
