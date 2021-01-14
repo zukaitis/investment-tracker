@@ -1,7 +1,5 @@
 ---
-name: Single Entry, Inc
-symbol: SIEN
-account: Local Bank
-group: Stocks
+name: Single Entry
+group: P2P lending
 data:
-  - { date: 2020-10, investment: +100, amount: 90, price: 1.125 }
+  - { date: 2020-10, investment: +100, value: 99.10 }

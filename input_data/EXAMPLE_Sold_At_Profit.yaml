@@ -5,5 +5,5 @@ account: Local Bank
 group: Stocks
 data:
   - { date: 2020-10-20, investment: -420, amount: 0 }
-  - { date: 2020-03, investment: +330, amount: 2.959 }
+  - { date: 2020-03, investment: +330, amount: 2.959, return_tax: 0.15 }
 

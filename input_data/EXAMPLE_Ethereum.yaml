@@ -1,6 +1,6 @@
 ---
 name: Ethereum
-symbol: ETH-EUR
+symbol: ETH-USD
 group: Cryptocurrency
 data:
   - { date: 2017-12, investment: +450, amount: 2}

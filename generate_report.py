@@ -91,14 +91,18 @@ def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
 
     data = pd.merge(data, yfdata, on='date', how='outer').sort_values(by=['date'])
 
-    for p in ['name', 'symbol', 'group']:
+    if 'return_tax' not in data.columns:
+        data['return_tax'] = 0.0
+    data['return_tax'] = pd.to_numeric(data['return_tax']).interpolate(method='pad').fillna(0.0)
+
+    for p in ['name', 'symbol', 'account', 'group']:
         if p in data.columns:
             data[p] = input_data.loc[input_data.index[0], p]
 
     data['amount'] = pd.to_numeric(data['amount']).interpolate(method='pad').fillna(0.0)
     data['investment'] = pd.to_numeric(data['investment']).fillna(0.0)
     data['value'] = data['amount'] * data['price'].interpolate(method='pad')
-    data['return'] = data['amount'] * data['Dividends'].fillna(0.0)
+    data['return'] = data['amount'] * data['Dividends'].fillna(0.0) * (1 - data['return_tax'])
 
     return data
 

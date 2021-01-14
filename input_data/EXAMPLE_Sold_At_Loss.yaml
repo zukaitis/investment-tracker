@@ -4,5 +4,5 @@ symbol: MMM
 account: Local Bank
 group: Stocks
 data:
-  - { date: 2017-12, investment: +480, amount: 2 }
+  - { date: 2017-12, investment: +480, amount: 2, return_tax: 0.15 }
   - { date: 2020-02, investment: -290, amount: 0 }
