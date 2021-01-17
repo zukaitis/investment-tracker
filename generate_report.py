@@ -27,20 +27,31 @@ class Settings:
     autofill_price_mark: str = 'Open'
 
 def currency_str(value: float) -> str:
-    if np.isnan(value):
-        return ''
-    return babel.numbers.format_currency(value, settings.currency, locale=settings.locale)
+    if np.isnan(value) or np.isinf(value):
+        return '?'
+    precision = 2 
+    if abs(value) < 0.0500:
+        precision = 4
+    elif abs(value) < 0.50:
+        precision = 3
+    return babel.numbers.format_currency(round(value, precision), settings.currency,
+        locale=settings.locale, decimal_quantization=False)
 
 def percentage_str(value: float) -> str:
     if np.isnan(value) or np.isinf(value):
-        return ''
+        return '?'
     precision = 4
-    if value > 0.5:  # 50%
+    if abs(value) >= 0.5:  # 50%
         precision = 2
-    elif value > 0.05:  # 5%
+    elif abs(value) >= 0.05:  # 5.0%
         precision = 3
     return babel.numbers.format_percent(round(value, precision), locale=settings.locale,
         decimal_quantization=False)
+
+def decimal_str(value: float) -> str:
+    if np.isnan(value) or np.isinf(value):
+        return '?'
+    return babel.numbers.format_decimal(value, locale=settings.locale)
 
 def currency_symbol() -> str:
     return babel.numbers.get_currency_symbol(settings.currency, locale=settings.locale)
@@ -331,7 +342,7 @@ def plot_historical_data(dataframe: pd.DataFrame, values: str, label_text: str) 
             f'<b>Total {label_text.lower()}:</b> %{{customdata}}<extra></extra>')))
 
     for a in asset_properties.index:
-        if not ((value_by_date[a].nunique() == 1) and (value_by_date[a].sum() == 0)):
+        if any(value_by_date[a] != 0):
             # only plot traces with at least one non-zero value
             fig.add_trace(go.Bar(x=value_by_date.index, y=value_by_date[a], name=a,
                 marker=dict(color=asset_properties.loc[a, 'color']),
@@ -366,7 +377,7 @@ def plot_historical_return(dataframe: pd.DataFrame, label_text: str) -> go.Figur
             f'<b>Total return received:</b> %{{customdata}}<extra></extra>')))
 
     for a in asset_properties.index:
-        if not ((value_by_date[a].nunique() == 1) and (value_by_date[a].sum() == 0)):
+        if any(value_by_date[a] != 0):
             # only plot traces with at least one non-zero value
             fig.add_trace(go.Bar(x=value_by_date.index, y=value_by_date[a], name=a,
                 customdata=np.transpose([str_value_by_date[a], str_value_by_date_cumulative[a]]),
@@ -433,6 +444,9 @@ def plot_historical_asset_data(input: pd.DataFrame) -> go.Figure:
         data['str_net_investment'] = data['net_investment'].apply(currency_str)
         data['str_return_received'] = data['return_received'].apply(currency_str)
         data['str_value'] = data['value'].apply(currency_str)
+        if (data['price'] != 0).any():
+            data['str_value'] += ('<br>Price: ' + data['price'].apply(currency_str)
+                + ' / Amt.: ' + data['amount'].apply(decimal_str))
 
         fig.add_trace(go.Scatter(x=data['date'], y=data['red_fill'], fill='tozeroy',
             mode='none', fillcolor='rgba(255,0,0,0.7)', hoverinfo='skip'))
@@ -638,6 +652,7 @@ def append_asset_data_tabs(document: html.Document):
             group_total = process_data(group_total.reset_index())
             group_total['name'] = f'{g} Total'
             group_total['symbol'] = np.NaN
+            group_total[['price', 'amount']] = 0
 
             content += append_asset_data_view(group_total)
         for a in group_assets:
@@ -658,18 +673,22 @@ if __name__ == '__main__':
         input_directory = arguments.input_dir
 
     settings = Settings
+    for entry in os.scandir(input_directory):
+        if entry.is_file() and (entry.path.endswith('.yaml') or entry.path.endswith('.yml')):
+            with open( entry, 'r' ) as read_file:
+                input = yaml.load( read_file, Loader=yaml.BaseLoader )
+            if any([f.name in input for f in dataclasses.fields(Settings)]):
+                for s in input:
+                    setattr(settings, s, input[s])
+                if 'owner' in input:
+                    settings.owner = f"{input['owner']}'s"
 
     assets = pd.DataFrame()
     for entry in os.scandir(input_directory):
         if entry.is_file() and (entry.path.endswith('.yaml') or entry.path.endswith('.yml')):
             with open( entry, 'r' ) as read_file:
                 input = yaml.load( read_file, Loader=yaml.BaseLoader )
-            if True in [f.name in input for f in dataclasses.fields(Settings)]:
-                for s in input:
-                    setattr(settings, s, input[s])
-                if 'owner' in input:
-                    settings.owner = f"{input['owner']}'s"
-            else:
+            if not any([f.name in input for f in dataclasses.fields(Settings)]):
                 ids = pd.DataFrame(input).drop(columns=['data'])
                 data = pd.DataFrame(input['data']).join(ids)
                 data = process_data(data)
