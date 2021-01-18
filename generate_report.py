@@ -197,14 +197,16 @@ def process_data(input_data, discard_zero_values: bool = True) -> pd.DataFrame:
 
 def calculate_monthly_values(input: pd.DataFrame) -> pd.DataFrame:
     daily = input.copy()
-    group_by_month = daily.groupby(
-        [daily['name'], daily['date'].dt.year, daily['date'].dt.month])
-    monthly = group_by_month.tail(1).copy().reset_index()
-    sum = group_by_month.agg(investment=('investment', 'sum'), rtrn=('return', 'sum'))
-    sum.index = monthly.index
-    monthly['return'] = sum['rtrn']
-    monthly['investment'] = sum['investment']
+    daily['year'] = daily['date'].dt.year
+    daily['month'] = daily['date'].dt.month
+    group_by_month = daily.groupby(['name', 'year', 'month'])
+
+    monthly = group_by_month.agg({'date': 'last', 'value': 'last', 'net_investment': 'last',
+        'net_investment_max': 'last', 'return': 'sum', 'profit':'last',
+        'relative_profit': 'last'}).reset_index()
+    
     monthly['date'] = monthly['date'].map(lambda x: x.replace(day=1))
+    monthly.drop(columns=['year', 'month'], inplace=True)
 
     return monthly
 
@@ -361,8 +363,7 @@ def plot_historical_data(dataframe: pd.DataFrame, values: str, label_text: str) 
 
 def plot_historical_return(dataframe: pd.DataFrame, label_text: str) -> go.Figure:
     value_by_date = dataframe.pivot(index='date', columns='name', values='return').fillna(0.0)
-    value_by_date_cumulative = dataframe.pivot(index='date', columns='name',
-        values='total_return_received')
+    value_by_date_cumulative = value_by_date.cumsum()
     str_value_by_date = value_by_date.applymap(currency_str)
     str_value_by_date_cumulative = value_by_date_cumulative.applymap(currency_str)
 
