@@ -360,7 +360,7 @@ def plot_historical_data(dataframe: pd.DataFrame, values: str, label_text: str) 
     return fig
 
 def plot_historical_return(dataframe: pd.DataFrame, label_text: str) -> go.Figure:
-    value_by_date = dataframe.pivot(index='date', columns='name', values='return')
+    value_by_date = dataframe.pivot(index='date', columns='name', values='return').fillna(0.0)
     value_by_date_cumulative = dataframe.pivot(index='date', columns='name',
         values='total_return_received')
     str_value_by_date = value_by_date.applymap(currency_str)
@@ -368,7 +368,7 @@ def plot_historical_return(dataframe: pd.DataFrame, label_text: str) -> go.Figur
 
     fig = go.Figure()
 
-    value_by_date_sum = value_by_date.sum(axis = 1, skipna = True).cumsum()
+    value_by_date_sum = value_by_date.sum(axis=1, skipna=True).cumsum()
     str_value_by_date_sum = value_by_date_sum.apply(currency_str)
     fig.add_trace(go.Scatter(x=value_by_date_sum.index, y=value_by_date_sum.values,
         mode='lines+markers', name='Total', marker=dict(color=cyan), yaxis='y2',
