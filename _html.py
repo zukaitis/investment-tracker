@@ -3,6 +3,7 @@ import dominate.tags as dt
 from dominate.util import raw
 from dataclasses import dataclass
 import typing
+from pathlib import Path
 
 class _HtmlObject:
     def __init__(self):
@@ -12,18 +13,26 @@ class _HtmlObject:
         return self._raw
 
 class Document:
-    def __init__(self, title: str):
+    def __init__(self, title: str, css_variables: dict):
         self._document = dominate.document(title=title)
         self._document.head += raw('<meta charset="utf-8"/>')
-        self._document.head += raw('<link rel="stylesheet" href="style.css">')
+        #self._document.head += raw('<link rel="stylesheet" href="style.css">')
+        self._document.head += raw('<style type=text/css>')
+        self._append_css_variables_to_head(css_variables)
+        self._append_file_to_head('style.css')
+        self._document.head += raw('</style>')
 
     def append(self, obj: typing.Union[_HtmlObject, str]):
         self._document += raw(str(obj))
-        # if type(obj) is Html.TabContainer:
-        #     self._update_tab_stylesheet(obj.container_index, obj.tab_count)
 
-    # def append(self, raw_html: str):
-    #     self._document += raw(raw_html)
+    def _append_file_to_head(self, file: str):
+        self._document.head += raw(Path(file).read_text())
+
+    def _append_css_variables_to_head(self, variables: str):
+        self._document.head += raw(':root {')
+        for v in variables:
+            self._document.head += raw(f'--{v}: {variables[v]};')
+        self._document.head += raw('}')
 
     def __repr__(self):
         return str(self._document)

@@ -3,6 +3,7 @@
 owner: Example
 currency: USD
 locale: en_US
+theme: auto
 
 # non existant settings don't crash the generator
 non-existant-setting: Whatever

@@ -10,13 +10,31 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+import plotly.io
 import yfinance as yf
 from dataclasses import dataclass
 import dataclasses
 import warnings
 import babel.numbers
+import babel.dates
 
 cyan = px.colors.qualitative.Plotly[5]
+
+colors_light = dict(
+    background_color='#e5ecf6',
+    text_color='#555555',
+    tab_background_color='#ffffff',
+    tab_shadow_color='#f0f0f0',
+    checked_tab_indicator_color='#00ccee',
+    hover_tab_indicator_color='#c6fbff')
+
+colors_dark = dict(
+    background_color='#283442',
+    text_color='#999999',
+    tab_background_color='#111111',
+    tab_shadow_color='#202020',
+    checked_tab_indicator_color='#00ccee',
+    hover_tab_indicator_color='#11363c')
 
 @dataclass
 class Settings:
@@ -25,6 +43,7 @@ class Settings:
     locale: str = 'en_US_POSIX'
     autofill_interval: str = '1d'
     autofill_price_mark: str = 'Open'
+    theme: str = 'auto'
 
 def currency_str(value: float) -> str:
     if np.isnan(value) or np.isinf(value):
@@ -52,6 +71,9 @@ def decimal_str(value: float) -> str:
     if np.isnan(value) or np.isinf(value):
         return '?'
     return babel.numbers.format_decimal(value, locale=settings.locale)
+
+def date_str(date: datetime.date) -> str:
+    return babel.dates.format_date(date, locale=settings.locale)
 
 def currency_symbol() -> str:
     return babel.numbers.get_currency_symbol(settings.currency, locale=settings.locale)
@@ -85,7 +107,9 @@ def percentage_tick_suffix() -> str:
 def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
     data = input_data.copy()
 
-    ticker = yf.Ticker(input_data.loc[input_data.index[0], 'symbol'])
+    symbol = input_data.loc[input_data.index[0], 'symbol']
+    ticker = yf.Ticker(symbol)
+    print(f'Fetching yfinance data for {symbol}')
     # download extra data, just to be sure, that the requred date will appear on yf dataframe
     start_date = input_data.loc[input_data.index[0], 'date'] - datetime.timedelta(days=7)  
     yfdata = ticker.history(start=start_date, interval=settings.autofill_interval)
@@ -392,7 +416,7 @@ def plot_historical_return(dataframe: pd.DataFrame, label_text: str) -> go.Figur
     fig.update_layout(yaxis2=dict(title='',
         titlefont=dict(color='cyan'), tickfont=dict(color='cyan'),
         ticksuffix=currency_tick_suffix(), tickprefix=currency_tick_prefix(), side='right', overlaying='y',
-        range=[0, max(value_by_date_sum.values) * 1.05], fixedrange=True),legend=dict(x=1.07))
+        range=[0, max(value_by_date_sum.values) * 1.05], fixedrange=True),legend=dict(x=1.1))
     fig.update_layout(barmode='group')
     six_months = [value_by_date.index[-1] - datetime.timedelta(days=(365/2 - 15)), value_by_date.index[-1] + datetime.timedelta(days=15)]
     fig.update_xaxes(range=six_months)
@@ -491,7 +515,8 @@ def plot_historical_asset_data(input: pd.DataFrame) -> go.Figure:
                 hovertemplate=f'Value: %{{customdata}}<extra></extra>'))
 
     fig.update_layout(hovermode='x', showlegend=False)
-    fig.update_layout(hoverlabel=dict(bgcolor='white'))
+    fig.update_layout(hoverlabel=dict(bgcolor=theme_colors['tab_background_color'],
+        font=dict(color=theme_colors['text_color'])))
     configure_historical_dataview(fig, latest_date - input.loc[input.index[0],'date'])
     one_year = [latest_date - datetime.timedelta(days=365), latest_date]
     fig.update_xaxes(range=one_year, rangeslider=dict(visible=True))
@@ -556,7 +581,7 @@ def plot_yearly_asset_data(data: pd.DataFrame) -> go.Figure:
 
     return fig
 
-def configure_historical_dataview(figure: go.Figure, time_range: datetime.timedelta):
+def configure_historical_dataview(figure: go.Figure, timerange: datetime.timedelta):
     # buttons, that are always present
     buttons = [dict(count=6, label='6M', step='month', stepmode='backward'),
         dict(count=1, label='YTD', step='year', stepmode='todate'),
@@ -565,14 +590,16 @@ def configure_historical_dataview(figure: go.Figure, time_range: datetime.timede
     # adding buttons depending on input time range
     years = [1, 2, 5, 10, 20, 50, 100]
     for i in range(1, len(years)):
-        if time_range.days > years[i-1] * 365:
+        if timerange.days > years[i-1] * 365:
             buttons.append(dict(count=years[i], label=f'{years[i]}Y',
                 step='year', stepmode='backward'))
 
     buttons.append(dict(label='ALL', step='all'))  # ALL is also always available
 
     figure.update_xaxes(type='date', rangeslider_visible=False,
-        rangeselector=dict(x=0, buttons=buttons))
+        rangeselector=dict(x=0, buttons=buttons, font=dict(color=theme_colors['text_color']),
+            bgcolor=theme_colors['background_color'],
+            activecolor=theme_colors['hover_tab_indicator_color']))
     figure.update_layout(margin=dict(l=10, r=10, t=20, b=10))
     figure.update_layout(xaxis=dict(title=dict(text='')), yaxis=dict(title=dict(text='')))
 
@@ -669,6 +696,8 @@ if __name__ == '__main__':
     parser.add_argument( 'input_dir', type = str, nargs = '?', default = None )
     arguments = parser.parse_args()
 
+    pd.set_option('display.max_rows', None)  # makes pandas print all dataframe rows
+
     input_directory = input_directory = os.path.dirname(os.path.realpath(__file__)) + os.path.sep + 'input_data'
     if arguments.input_dir != None:
         input_directory = arguments.input_dir
@@ -714,9 +743,6 @@ if __name__ == '__main__':
     asset_properties = asset_properties.sort_values(by=['group', 'name'])
     asset_properties = asset_properties.set_index('name')
 
-    pd.set_option('display.max_rows', None)
-    print(asset_properties)
-
     color_map = asset_properties.to_dict()['color']
 
     earliest_date = min(assets['date'])
@@ -727,19 +753,33 @@ if __name__ == '__main__':
 
     monthly_data = calculate_monthly_values(assets)
 
-    title = f'{settings.owner} investment portfolio'
-    report = html.Document(title)
+    if settings.theme == 'auto':
+        settings.theme = 'light' if current_stats['profit'].sum() > 0 else 'dark'
+    
+    if settings.theme == 'light':
+        plotly.io.templates.default = 'plotly_white'
+        theme_colors = colors_light
+    else:
+        plotly.io.templates.default = 'plotly_dark'
+        theme_colors =  colors_dark
 
+    title = f'{settings.owner} investment portfolio'
+    report = html.Document(title, css_variables=theme_colors)
+
+    print('Generating report')
     report.append(f'<h1>{title}</h1>')
-    report.append(f'<h3>Data from {earliest_date:%Y-%m-%d} to {latest_date:%Y-%m-%d}</h3>')
+    report.append(f'<h3>Data from {date_str(earliest_date)} to {date_str(latest_date)}</h3>')
     append_overall_data_tabs(report)
     append_asset_data_tabs(report)
 
-    report.append(f'<p class="link">Report generated on {datetime.date.today():%Y-%m-%d}, '
+    report.append(f'<p class="footer">Report generated on {date_str(datetime.date.today())}, '
         f'using open source script: '
         f'<a href="https://github.com/zukaitis/investment-tracker/">Investment Tracker</a>'
         f'<br>All charts are displayed using '
         f'<a href="https://plotly.com/python/">Plotly</p>')
 
+    print('Writing to file')
     with open('report.html', 'w') as f:
         print(report, file=f)
+
+    print('Completed successfully')
