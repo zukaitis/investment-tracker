@@ -44,6 +44,7 @@ class Settings:
     autofill_interval: str = '1d'
     autofill_price_mark: str = 'Open'
     theme: str = 'auto'
+    account_total_groups: list = dataclasses.field(default_factory=list)
 
 def currency_str(value: float) -> str:
     if np.isnan(value) or np.isinf(value):
@@ -660,31 +661,50 @@ def append_overall_data_tabs(document: html.Document):
 
     document.append(html.TabContainer(tabs))
 
+def calculate_total_historical_data(input: pd.DataFrame, name: str) -> pd.DataFrame:
+    data = input.copy()
+    group_assets = data['name'].unique()
+    all_dates = data.groupby('date').tail(1)['date']
+    group_total = pd.DataFrame(columns=assets.columns).set_index(
+        'date').reindex(all_dates).fillna(0)
+    group_total[['name', 'symbol', 'group', 'account', 'color']] = ''
+    for a in group_assets:
+        asset_data = process_data(data[data['name'] == a].set_index(
+            'date').reindex(all_dates).reset_index(), discard_zero_values=False)
+        asset_data = asset_data.set_index('date').fillna(0)
+        asset_data[['name', 'symbol', 'group', 'account', 'color']] = ''
+        group_total = group_total.add(asset_data)
+    group_total = process_data(group_total.reset_index())
+    group_total['name'] = name
+    group_total['symbol'] = np.NaN
+    group_total[['price', 'amount']] = 0
+    return group_total
+
 def append_asset_data_tabs(document: html.Document):
-
-    groups = assets['group'].unique()
-
+    groups = sorted(assets['group'].unique())
     tabs = []
     for g in groups:
-        group_assets = assets.loc[assets['group'] == g, 'name'].unique()
         content = ''
-        if len(group_assets) > 1:
-            all_dates = assets[assets['group'] == g].groupby('date').tail(1)['date']
-            group_total = pd.DataFrame(columns=assets.columns).set_index('date').reindex(all_dates).fillna(0.0)
-            group_total[['name', 'symbol', 'group', 'account', 'color']] = ''
-            for a in group_assets:
-                asset_data = process_data(assets[assets['name'] == a].set_index('date').reindex(all_dates).reset_index(), discard_zero_values=False)
-                asset_data = asset_data.set_index('date').fillna(0.0)
-                asset_data[['name', 'symbol', 'group', 'account', 'color']] = ''
-                group_total = group_total.add(asset_data)
-            group_total = process_data(group_total.reset_index())
-            group_total['name'] = f'{g} Total'
-            group_total['symbol'] = np.NaN
-            group_total[['price', 'amount']] = 0
 
+        group_data = assets[assets['group'] == g]
+        group_accounts = sorted(group_data['account'].unique())
+        
+        # display group total if there is more than one account, or only "mixed" account
+        if (len(group_accounts) > 1) or ((len(group_accounts) == 1) and (group_accounts[0] == '')):
+            group_total = calculate_total_historical_data(group_data, f'{g} Total')
             content += append_asset_data_view(group_total)
-        for a in group_assets:
-            content += append_asset_data_view(assets[assets['name'] == a])
+        
+        for acc in group_accounts:
+            account_data = group_data[group_data['account'] == acc]
+            account_assets = sorted(account_data['name'].unique())
+
+            if (len(account_assets) > 1) and (acc != '') and (g in settings.account_total_groups):
+                account_total = calculate_total_historical_data(account_data, f'{acc} Total')
+                content += append_asset_data_view(account_total)
+
+            for a in account_assets:
+                content += append_asset_data_view(account_data[account_data['name'] == a])
+
         tabs.append(html.Tab(html.Label(g), content))
     document.append(html.TabContainer(tabs))
 
