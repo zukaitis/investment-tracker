@@ -36,15 +36,59 @@ colors_dark = dict(
     checked_tab_indicator_color='#00ccee',
     hover_tab_indicator_color='#11363c')
 
-@dataclass
+def print_warning(message: str):
+    warnings.warn(f'WARNING: {message}')
+
 class Settings:
-    owner: str = 'Your'
-    currency: str = 'EUR'
-    locale: str = 'en_US_POSIX'
-    autofill_interval: str = '1d'
-    autofill_price_mark: str = 'Open'
-    theme: str = 'auto'
-    account_total_groups: list = dataclasses.field(default_factory=list)
+    owner = 'Your'
+    currency = 'EUR'
+    locale = 'en_US_POSIX'
+    autofill_interval = '1d'
+    autofill_price_mark = 'Open'
+    theme = 'auto'
+    account_total_groups = []
+
+    def __setattr__(self, name, value):
+        if name == 'owner':
+            self.__dict__[name] = f"{value}'s"
+        elif name == 'currency':
+            try:
+                yf.Ticker(f'{value}=X').info
+            except ValueError:
+                print_warning(f'Unknown currency - "{value}"')
+            else:
+                self.__dict__[name] = value
+        elif name == 'locale':
+            if babel.localedata.exists(value):
+                self.__dict__[name] = value
+            else:
+                print_warning(f'Unknown locale - "{value}"')
+        elif name == 'autofill_interval':
+            allowed = ['1d', '5d', '1wk', '1mo', '3mo']
+            if value in allowed:
+                self.__dict__[name] = value
+            else:
+                print_warning(f'Unknown interval - "{value}". Allowed intervals: {allowed}')
+        elif name == 'autofill_price_mark':
+            allowed = ['Open', 'Close', 'High', 'Low']
+            if value in allowed:
+                self.__dict__[name] = value
+            else:
+                print_warning(f'Unknown price mark - "{value}". Allowed marks: {allowed}')
+        elif name == 'theme':
+            allowed = ['light', 'dark', 'auto']
+            if value in allowed:
+                self.__dict__[name] = value
+            else:
+                print_warning(f'Unknown theme - "{value}". Allowed themes: {allowed}')
+        elif name not in self:
+            print_warning(f'No such setting - "{name}"')
+        else:
+            self.__dict__[name] = value
+
+    def __iter__(self):
+        variables = [d for d in dir(self) if not d.startswith('_')]
+        return iter(variables)
 
 def currency_str(value: float) -> str:
     if np.isnan(value) or np.isinf(value):
@@ -152,8 +196,7 @@ def process_data(input_data, discard_zero_values: bool = True) -> pd.DataFrame:
     if data.duplicated(subset='date').any():
         dataset_name = data.loc[data.index[0], 'name']
         duplicates = data.loc[data.duplicated(subset='date'), 'date']
-        warnings.warn(
-            f'WARNING: There are duplicate dates in "{dataset_name}" dataset:\n{duplicates}')
+        print_warning(f'There are duplicate dates in "{dataset_name}" dataset:\n{duplicates}')
         data.drop_duplicates(subset=['date'], inplace=True)
     data.sort_values(by=['date'], inplace=True)
 
@@ -712,33 +755,42 @@ if __name__ == '__main__':
     # making warnings not show source, since it's irrelevant in this case
     warnings.formatwarning = lambda msg, *args, **kwargs: f'{msg}\n'
 
+    settings = Settings()
+
     parser = argparse.ArgumentParser()
-    parser.add_argument( 'input_dir', type = str, nargs = '?', default = None )
+    parser.add_argument('input_dir', type=str, nargs='?',
+        default=f'{os.path.dirname(os.path.realpath(__file__))}{os.path.sep}input_data')
+    for s in settings:  # all settings are possible arguments
+        parser.add_argument(f'--{s}', type=type(getattr(settings, s)))
     arguments = parser.parse_args()
+    for s in settings:
+        if (getattr(arguments, s) != None):
+            setattr(settings, s, getattr(arguments, s))
 
     pd.set_option('display.max_rows', None)  # makes pandas print all dataframe rows
 
-    input_directory = input_directory = os.path.dirname(os.path.realpath(__file__)) + os.path.sep + 'input_data'
-    if arguments.input_dir != None:
-        input_directory = arguments.input_dir
-
-    settings = Settings
-    for entry in os.scandir(input_directory):
+    settings_found = 'no'
+    for entry in os.scandir(arguments.input_dir):
         if entry.is_file() and (entry.path.endswith('.yaml') or entry.path.endswith('.yml')):
             with open( entry, 'r' ) as read_file:
                 input = yaml.load( read_file, Loader=yaml.BaseLoader )
-            if any([f.name in input for f in dataclasses.fields(Settings)]):
+            # check if there are general settings in file
+            if any([s in input for s in settings]):
                 for s in input:
                     setattr(settings, s, input[s])
-                if 'owner' in input:
-                    settings.owner = f"{input['owner']}'s"
+                if settings_found == 'yes':
+                    print_warning(f'Multiple settings files detected, expect trouble')
+                    settings_found = 'warned'
+                elif settings_found == 'no':
+                    settings_found = 'yes'
 
     assets = pd.DataFrame()
-    for entry in os.scandir(input_directory):
+    for entry in os.scandir(arguments.input_dir):
         if entry.is_file() and (entry.path.endswith('.yaml') or entry.path.endswith('.yml')):
             with open( entry, 'r' ) as read_file:
                 input = yaml.load( read_file, Loader=yaml.BaseLoader )
-            if not any([f.name in input for f in dataclasses.fields(Settings)]):
+            # check that there are no general settings in file
+            if not any([s in input for s in settings]):
                 ids = pd.DataFrame(input).drop(columns=['data'])
                 data = pd.DataFrame(input['data']).join(ids)
                 data = process_data(data)

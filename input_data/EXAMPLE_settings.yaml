@@ -9,3 +9,4 @@ account_total_groups:
 
 # non existant settings don't crash the generator
 non-existant-setting: Whatever
+__getattr__: "In case you try being smart"
