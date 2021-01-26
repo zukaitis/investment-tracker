@@ -1,5 +1,5 @@
 ---
-name: Same name 1
+name: Same name
 group: P2P lending
 data:
   - { date: 2020-10, investment: +100, value: 99.10 }

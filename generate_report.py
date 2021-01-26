@@ -267,7 +267,7 @@ def calculate_monthly_values(input: pd.DataFrame) -> pd.DataFrame:
     daily = input.copy()
     daily['year'] = daily['date'].dt.year
     daily['month'] = daily['date'].dt.month
-    group_by_month = daily.groupby(['name', 'year', 'month'])
+    group_by_month = daily.groupby(['id', 'year', 'month'])
 
     monthly = group_by_month.agg({'date': 'last', 'value': 'last', 'net_investment': 'last',
         'net_investment_max': 'last', 'return': 'sum', 'profit':'last',
@@ -358,7 +358,7 @@ def plot_sunburst(input: pd.DataFrame, values: str, label_text: str):
             f'<b>%{{label}}</b><br>{label_text}: %{{customdata}}<extra></extra>')
 
 def plot_historical_data(dataframe: pd.DataFrame, values: str, label_text: str) -> go.Figure:
-    value_by_date = dataframe.pivot(index='date', columns='name', values=values)
+    value_by_date = dataframe.pivot(index='date', columns='id', values=values)
     if values != 'profit':
         value_by_date.interpolate(method='pad', inplace=True)
     str_value_by_date = value_by_date.applymap(currency_str)
@@ -373,14 +373,14 @@ def plot_historical_data(dataframe: pd.DataFrame, values: str, label_text: str) 
             f'%{{x|%B %Y}}<br>'
             f'<b>Total {label_text.lower()}:</b> %{{customdata}}<extra></extra>')))
 
-    for a in asset_properties.index:
-        if any(value_by_date[a] != 0):
-            # only plot traces with at least one non-zero value
-            fig.add_trace(go.Bar(x=value_by_date.index, y=value_by_date[a], name=a,
+    for a in value_by_date.columns:
+        if any(value_by_date[a] != 0):  # only plot traces with at least one non-zero value
+            name = asset_properties.loc[a, 'name']
+            fig.add_trace(go.Bar(x=value_by_date.index, y=value_by_date[a], name=name,
                 marker=dict(color=asset_properties.loc[a, 'color']),
                 customdata=np.transpose(str_value_by_date[a]), hovertemplate=(
                     f'%{{x|%B %Y}}<br>'
-                    f'<b>{a}</b><br>'
+                    f'<b>{name}</b><br>'
                     f'{label_text}: %{{customdata}}<extra></extra>')))
 
     fig.update_layout(barmode='relative')
@@ -392,7 +392,7 @@ def plot_historical_data(dataframe: pd.DataFrame, values: str, label_text: str) 
     return fig
 
 def plot_historical_return(dataframe: pd.DataFrame, label_text: str) -> go.Figure:
-    value_by_date = dataframe.pivot(index='date', columns='name', values='return').fillna(0.0)
+    value_by_date = dataframe.pivot(index='date', columns='id', values='return').fillna(0.0)
     value_by_date_cumulative = value_by_date.cumsum()
     str_value_by_date = value_by_date.applymap(currency_str)
     str_value_by_date_cumulative = value_by_date_cumulative.applymap(currency_str)
@@ -407,14 +407,14 @@ def plot_historical_return(dataframe: pd.DataFrame, label_text: str) -> go.Figur
             f'%{{x|%B %Y}}<br>'
             f'<b>Total return received:</b> %{{customdata}}<extra></extra>')))
 
-    for a in asset_properties.index:
-        if any(value_by_date[a] != 0):
-            # only plot traces with at least one non-zero value
-            fig.add_trace(go.Bar(x=value_by_date.index, y=value_by_date[a], name=a,
+    for a in value_by_date.columns:
+        if any(value_by_date[a] != 0):  # only plot traces with at least one non-zero value
+            name = asset_properties.loc[a, 'name']
+            fig.add_trace(go.Bar(x=value_by_date.index, y=value_by_date[a], name=name,
                 customdata=np.transpose([str_value_by_date[a], str_value_by_date_cumulative[a]]),
                 marker=dict(color=asset_properties.loc[a, 'color']), hovertemplate=(
                     f'%{{x|%B %Y}}<br>' 
-                    f'<b>{a}</b><br>'
+                    f'<b>{name}</b><br>'
                     f'{label_text}: %{{customdata[0]}}<br>'
                     f'Total return received: %{{customdata[1]}}<extra></extra>')))
 
@@ -431,7 +431,7 @@ def plot_historical_return(dataframe: pd.DataFrame, label_text: str) -> go.Figur
     return fig
 
 def plot_historical_relative_profit(dataframe: pd.DataFrame) -> go.Figure:
-    value_by_date = dataframe.pivot(index='date', columns='name', values='relative_profit')
+    value_by_date = dataframe.pivot(index='date', columns='id', values='relative_profit')
     value_by_date = value_by_date.drop(value_by_date.columns[value_by_date.max() == -1], axis=1)
     str_value_by_date = value_by_date.applymap(percentage_str)
 
@@ -445,13 +445,14 @@ def plot_historical_relative_profit(dataframe: pd.DataFrame) -> go.Figure:
             f'%{{x|%B %Y}}<br>'
             f'<b>Total profit:</b> %{{customdata}}<extra></extra>')))
 
-    for a in asset_properties.index:
-        if a in value_by_date.columns:
-            fig.add_trace(go.Bar(x=value_by_date.index, y=value_by_date[a]*100, name=a,
+    for a in value_by_date.columns:
+        if any(value_by_date[a] != 0):  # only plot traces with at least one non-zero value
+            name = asset_properties.loc[a, 'name']
+            fig.add_trace(go.Bar(x=value_by_date.index, y=value_by_date[a]*100, name=name,
                 marker=dict(color=asset_properties.loc[a,'color']),
                 customdata=np.transpose(str_value_by_date[a]), hovertemplate=(
                     f'%{{x|%B %Y}}<br>'
-                    f'<b>{a}</b><br>'
+                    f'<b>{name}</b><br>'
                     f'Relative net profit: %{{customdata}}<extra></extra>')))
 
     fig.update_layout(barmode='group')
@@ -664,16 +665,16 @@ def append_overall_data_tabs(document: html.Document):
 
 def calculate_total_historical_data(input: pd.DataFrame, name: str) -> pd.DataFrame:
     data = input.copy()
-    group_assets = data['name'].unique()
+    group_assets = data['id'].unique()
     all_dates = data.groupby('date').tail(1)['date']
     group_total = pd.DataFrame(columns=assets.columns).set_index(
         'date').reindex(all_dates).fillna(0)
-    group_total[['name', 'symbol', 'group', 'account', 'color']] = ''
+    group_total[['id', 'name', 'symbol', 'group', 'account', 'color']] = ''
     for a in group_assets:
-        asset_data = process_data(data[data['name'] == a].set_index(
+        asset_data = process_data(data[data['id'] == a].set_index(
             'date').reindex(all_dates).reset_index(), discard_zero_values=False)
         asset_data = asset_data.set_index('date').fillna(0)
-        asset_data[['name', 'symbol', 'group', 'account', 'color']] = ''
+        asset_data[['id', 'name', 'symbol', 'group', 'account', 'color']] = ''
         group_total = group_total.add(asset_data)
     group_total = process_data(group_total.reset_index())
     group_total['name'] = name
@@ -755,7 +756,8 @@ if __name__ == '__main__':
                 assets = assets.append(data)
 
     assets['account'] = assets['account'].fillna(' ')  # empty string doesn't work
-    group_by_name = assets.groupby('name')[['name', 'group', 'account', 'value']].tail(1)
+    assets['id'] = assets['group'] + assets['account'] + assets['name']
+    group_by_name = assets.groupby('id')[['id', 'name', 'group', 'account', 'value']].tail(1)
     group_by_name.sort_values(by=['value'], inplace=True, ascending=False)
     group_by_name = group_by_name.drop(columns=['value'])
 
@@ -770,13 +772,13 @@ if __name__ == '__main__':
         index += 1
 
     assets = assets.merge(asset_properties)
-    asset_properties = asset_properties.sort_values(by=['group', 'name'])
-    asset_properties = asset_properties.set_index('name')
+    asset_properties = asset_properties.sort_values(by='id')
+    asset_properties = asset_properties.set_index('id')
 
     earliest_date = min(assets['date'])
     latest_date = max(assets['date'])
 
-    current_stats = assets.groupby('name')[['name', 'symbol', 'group', 'account', 'net_investment', 'net_investment_max', 'return_received', 'value', 'profit', 'relative_profit', 'color', 'date']].tail(1)
+    current_stats = assets.groupby('id')[['id', 'name', 'symbol', 'group', 'account', 'net_investment', 'net_investment_max', 'return_received', 'value', 'profit', 'relative_profit', 'color', 'date']].tail(1)
     current_stats = current_stats[current_stats['date'] > latest_date - pd.DateOffset(months=6)]  # TODO: take months value from settings
 
     monthly_data = calculate_monthly_values(assets)
