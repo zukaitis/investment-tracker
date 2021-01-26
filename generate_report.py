@@ -278,74 +278,78 @@ def calculate_monthly_values(input: pd.DataFrame) -> pd.DataFrame:
 
     return monthly
 
-def plot_sunburst(input: pd.DataFrame, values: str, label_text: str) -> go.Sunburst:
-    dataframe = input.copy()
-    dataframe = dataframe.loc[dataframe[values] != 0]  # filter 0 values
-    dataframe['rootnode'] = ''
-    dataframe['profitability'] = np.where(dataframe[values] > 0, 'Profitable', 'Unprofitable')
+def fraction_string(input: pd.DataFrame) -> pd.Series:
+    data = input.copy()
+    data = data.assign(percentage_in_profitability='', of_profitability='', separator='',
+        of_group='')
 
-    dataframe['account'] = np.where(dataframe['account'] == ' ',
-        dataframe['group'], dataframe['account'])
-
-    # Manipulating names in order to separate positive and negative values
-    dataframe['account'] = np.where(dataframe[values] < 0,
-        dataframe['account'] + ' ', dataframe['account'])
-    dataframe['group'] = np.where(dataframe[values] < 0,
-        dataframe['group'] + ' ', dataframe['group'])
-
-    dataframe['group_sum'] = 0
-    for g in dataframe['group'].unique():
-        dataframe.loc[dataframe['group'] == g, 'group_sum'] = \
-            dataframe.loc[dataframe['group'] == g, values].sum()
-    dataframe['profitability_sum'] = 0
-    for g in dataframe['profitability'].unique():
-        dataframe.loc[dataframe['profitability'] == g, 'profitability_sum'] = \
-            dataframe.loc[dataframe['profitability'] == g, values].sum()
-
-    data = pd.DataFrame(columns=['label', 'parent', 'value', 'profitability', 'color'])
-
-    if dataframe[values].min() < 0:
-        path = ['rootnode', 'profitability', 'group', 'account', 'name']
+    data['percentage_in_profitability'] = np.where(data['fraction_in_profitability'] < 1,
+        '<br>' + data['fraction_in_profitability'].apply(percentage_str), '')
+    if data['profitability'].nunique() > 1:  # if values are separated by profitability
+        data['of_profitability'] = np.where(data['fraction_in_profitability'] < 1,
+            ' of ' + data['profitability'], '')
+        data['separator'] = '<br>'
     else:
-        path = ['rootnode', 'group', 'account', 'name']
+        data['separator'] = ' / '
+    data['separator'] = np.where(data['fraction_in_group'] < 1, data['separator'], '')
+    data['of_group'] = np.where(data['fraction_in_group'] < 1,
+        data['fraction_in_group'].apply(percentage_str) + ' of ' + data['group'], '')
+    # don't display fraction in group, when it matches fraction in profitability
+    data.loc[data['fraction_in_profitability'] == data['fraction_in_group'],
+        ['separator', 'of_group']] = [['', '']]
+        
+    return (data['percentage_in_profitability'] + data['of_profitability'] + data['separator']
+        + data['of_group'])
 
-    for i in range(1, len(path)):
-        d = dataframe.groupby(path[i]).first().reset_index()
-        d[values] = dataframe.groupby(path[i]).sum().reset_index()[values]
+def plot_sunburst(input: pd.DataFrame, values: str, label_text: str):
+    data = input[input[values] != 0].copy()  # filter 0 values
+    relative_columns = ['group', 'account', 'name', values, 'color']
+    if values == 'relative_net_profit':
+        data = data.loc[data['relative_profit'] != -1]  # filter -100% values (taxes)
+        relative_columns += ['profit', 'net_investment']
+    data = data[relative_columns]  # leave only relative columns
+    data['profitability'] = np.where(data[values] > 0, 'Profitable', 'Unprofitable')
+    # move name in place of account to avoid empty rings in graph
+    data.loc[data['account'] == ' ', ['account', 'name']] = np.array([
+        data.loc[data['account'] == ' ', 'name'], None], dtype='object')
+
+    data[['profitability_sum', 'group_sum']] = 0
+    for p in data['profitability'].unique():
+        p_subset = (data['profitability'] == p)
+        data.loc[p_subset, 'profitability_sum'] = data.loc[p_subset, values].sum()
+        for g in data.loc[p_subset, 'group'].unique():
+            g_subset = p_subset & (data['group'] == g)
+            data.loc[g_subset, 'group_sum'] = data.loc[g_subset, values].sum()
+    
+    graph_data = pd.DataFrame(columns=['label', 'id', 'parent', 'value', 'color'])
+    graph_data[['label', 'id', 'parent']] = ''
+    tree = ['profitability', 'group', 'account', 'name']
+    if values in ['value', 'net_investment', 'return_received']:
+        tree.remove('profitability')  # don't separate these graphs by profitability
+
+    for t in range(len(tree)):
+        d = data.groupby(tree[:t+1]).first().reset_index()
+        d[values] = data.groupby(tree[:t+1]).sum().reset_index()[values]
         d['fraction_in_group'] = d[values] / d['group_sum']
         d['fraction_in_profitability'] = d[values] / d['profitability_sum']
-
-        # creating displayed string from 5 parts, which are formated depending on the values
-        d = d.assign(s1='', s2='', s3='', s4='')
-        if d['fraction_in_profitability'].iloc[0] < 1:
-            if d['group'].nunique() > 1:
-                d['s1'] = '<br>' + d['fraction_in_profitability'].apply(percentage_str)
-                if dataframe[values].min() < 0:
-                    d['s2'] = ' of ' + d['profitability']
-                    d['s3'] = '<br>'
-                else:
-                    d['s3'] = ' / '
-            else:
-                d['s3'] = np.where(d['fraction_in_group'] < 1, '<br>', '')
-            d['s4'] = np.where(d['fraction_in_group'] < 1,
-                d['fraction_in_group'].apply(percentage_str) + ' of ' + d['group'], '')
-            d['s3'] = np.where(d['fraction_in_group'] < 1, d['s3'], '')
-        d['display_string'] = d[values].apply(currency_str) + d['s1'] + d['s2'] + d['s3'] + d['s4']
-
+        d['display_string'] = d[values].apply(currency_str) + fraction_string(d)
         d[values] = abs(d[values])
-        d = d[[path[i], path[i-1], values, 'display_string', 'color']]
-        d.columns = ['label', 'parent', 'value', 'display_string', 'color']
-        # remove rows, where label matches parent
-        d = d.drop(d[d.label == d.parent].index)
-        data = data.append(d)
+        d['parent'] = ''
+        for i in range(t):
+            d['parent'] += d[tree[i]]
+        d['id'] = d['parent'] + d[tree[t]]
+        d = d[[tree[t], 'id', 'parent', values, 'display_string', 'color']]
+        d.columns = ['label', 'id', 'parent', 'value', 'display_string', 'color']
+        graph_data = graph_data.append(d)
 
     # Set colors of Profitable and Unprofitable labels if they exist
-    data.loc[data['label'] == 'Profitable', 'color'] = 'green'
-    data.loc[data['label'] == 'Unprofitable', 'color'] = 'red'
+    graph_data.loc[graph_data['label'] == 'Profitable', 'color'] = 'green'
+    graph_data.loc[graph_data['label'] == 'Unprofitable', 'color'] = 'red'
 
-    return go.Sunburst(labels=data['label'], parents=data['parent'],
-        values=data['value'], customdata=data['display_string'],
-        marker=dict(colors=data['color']), branchvalues='total', hovertemplate=
+    return go.Sunburst(labels=graph_data['label'], ids=graph_data['id'],
+        parents=graph_data['parent'], values=graph_data['value'],
+        customdata=graph_data['display_string'], marker=dict(colors=graph_data['color']),
+        branchvalues='total', hovertemplate=
             f'<b>%{{label}}</b><br>{label_text}: %{{customdata}}<extra></extra>')
 
 def plot_relative_profit_sunburst(input: pd.DataFrame) -> go.Sunburst:
