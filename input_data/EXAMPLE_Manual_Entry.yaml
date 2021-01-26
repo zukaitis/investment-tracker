@@ -1,0 +1,8 @@
+---
+name: Same name 2
+group: P2P lending
+account: Out of Ideas
+data:
+  - { date: 2020-01, investment: +200, value: 199.10 }
+  - { date: 2020-02, value: 192 }
+  - { date: 2020-03, value: 192.90 }
