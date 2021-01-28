@@ -46,7 +46,6 @@ class Settings:
     autofill_interval = '1d'
     autofill_price_mark = 'Open'
     theme = 'auto'
-    account_total_groups = []
 
     def __setattr__(self, name, value):
         if name == 'owner':
@@ -693,7 +692,8 @@ def append_asset_data_tabs(document: html.Document):
         group_accounts = sorted(group_data['account'].unique())
         
         # display group total if there is more than one account, or only "mixed" account
-        if (len(group_accounts) > 1) or ((len(group_accounts) == 1) and (group_accounts[0] == '')):
+        if ((len(group_accounts) > 1) or
+                ((len(group_accounts) == 1) and (group_accounts[0] == ' '))):
             group_total = calculate_total_historical_data(group_data, f'{g} Total')
             content += append_asset_data_view(group_total)
         
@@ -701,7 +701,7 @@ def append_asset_data_tabs(document: html.Document):
             account_data = group_data[group_data['account'] == acc]
             account_assets = sorted(account_data['name'].unique())
 
-            if (len(account_assets) > 1) and (acc != '') and (g in settings.account_total_groups):
+            if (len(account_assets) > 1) and (acc != ' '):
                 account_total = calculate_total_historical_data(account_data, f'{acc} Total')
                 content += append_asset_data_view(account_total)
 

@@ -4,8 +4,6 @@ owner: Example
 currency: USD
 locale: en_US
 theme: auto
-account_total_groups:
-  - Stocks
 
 # non existant settings don't crash the generator
 non-existant-setting: Whatever
