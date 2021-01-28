@@ -211,12 +211,6 @@ def process_data(input_data, discard_zero_values: bool = True) -> pd.DataFrame:
         else:
             data['investment'] = 0.0
 
-        if 'return' in data.columns:
-            data['return'] = pd.to_numeric(data['return'])
-            data['return'] = data['return'].fillna(0.0)
-        else:
-            data['return'] = 0.0
-
         if 'amount' in data.columns:
             data['amount'] = pd.to_numeric(data['amount'])
             data['amount'] = data['amount'].interpolate(method='pad')
@@ -240,6 +234,12 @@ def process_data(input_data, discard_zero_values: bool = True) -> pd.DataFrame:
         else:
             data['value'] = 0.0
         data['value'] = data['value'].fillna(0.0)
+
+    if 'return' in data.columns:
+        data['return'] = pd.to_numeric(data['return'])
+        data['return'] = data['return'].fillna(0.0)
+    else:
+        data['return'] = 0.0
 
     nonzero_after_zero_mask = ((data['value'] != 0) & (data['value'].shift(1) == 0))
     zero_mask = (data['value'] == 0) & (data['investment'] == 0)
