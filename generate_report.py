@@ -160,7 +160,7 @@ def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
     yfdata = ticker.history(start=start_date, interval=settings.autofill_interval)
     if ticker.info['currency'] != settings.currency:
         # convert currency, if it differs from the one selected in settings
-        currency_ticker = yf.Ticker(f"{settings.currency}{ticker.info['currency']}=X")
+        currency_ticker = yf.Ticker(f"{ticker.info['currency']}{settings.currency}=X")
         currency_rate = currency_ticker.history(start=start_date,
             interval=settings.autofill_interval)
         yfdata[settings.autofill_price_mark] *= currency_rate[settings.autofill_price_mark]
@@ -182,7 +182,8 @@ def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
     data['amount'] = pd.to_numeric(data['amount']).interpolate(method='pad').fillna(0.0)
     data['investment'] = pd.to_numeric(data['investment']).fillna(0.0)
     data['value'] = data['amount'] * data['price'].interpolate(method='pad')
-    data['return'] = data['amount'] * data['Dividends'].fillna(0.0) * (1 - data['return_tax'])
+    if 'return' not in data.columns:
+        data['return'] = data['amount'] * data['Dividends'].fillna(0.0) * (1 - data['return_tax'])
 
     return data
 
