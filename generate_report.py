@@ -179,8 +179,9 @@ def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
             data[p] = input_data.loc[input_data.index[0], p]
 
     data['amount'] = pd.to_numeric(data['amount']).interpolate(method='pad').fillna(0.0)
+    data['price'] = data['price'].interpolate(method='pad')
     data['investment'] = pd.to_numeric(data['investment']).fillna(0.0)
-    data['value'] = data['amount'] * data['price'].interpolate(method='pad')
+    data['value'] = data['amount'] * data['price']
     if 'return' not in data.columns:
         data['return'] = data['amount'] * data['Dividends'].fillna(0.0) * (1 - data['return_tax'])
 
@@ -548,7 +549,8 @@ def plot_yearly_asset_data(data: pd.DataFrame) -> go.Figure:
     yearly_data['date'] = yearly_data['date'].dt.year - 1
     if yearly_data.index[-1] != yearly_data.index[-2]:
         yearly_data.loc[yearly_data.index[-1], 'date'] += 1  # set back year of last row
-    yearly_data.drop(yearly_data.head(1).index, inplace=True)
+    yearly_data.drop(yearly_data.head(1).index, inplace=True)  # remove first row
+    yearly_data.drop_duplicates(subset=['date'], inplace=True)
 
     yearly_data['value_change_positive'] = np.where(yearly_data['value_change'] > 0,
         yearly_data['value_change'], 0)
