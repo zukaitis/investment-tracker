@@ -17,7 +17,7 @@ jobs:
       - name: Install setuptools
         run: pip3 install setuptools
       - name: Install Python packages
-        run: pip3 install pandas numpy plotly yfinance babel dominate
+        run: pip3 install pandas numpy plotly yfinance babel dominate dataclasses
       - name: Generate Report
         run: ./generate_report.py
       - name: Get Date
