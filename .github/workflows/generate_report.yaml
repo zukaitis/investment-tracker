@@ -22,15 +22,15 @@ jobs:
         run: ./generate_report.py
       - name: Get Date
         id: get_date
-        run: echo "::set-output name=date::$(date -I)"
+        run: echo "::set-output name=date::$(date -I)" && echo "::set-output name=datetime::$(date '+%F %T')"
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ steps.get_date.outputs.date }}
-          release_name: Report ${{ steps.get_date.outputs.date }}
+          tag_name: ${{ steps.get_date.outputs.datetime }}
+          release_name: Report ${{ steps.get_date.outputs.datetime }}
           draft: false
           prerelease: false
       - name: Upload Release Asset
