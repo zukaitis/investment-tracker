@@ -1,0 +1,43 @@
+---
+name: Generate Report
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  push:
+    branches:
+      - master
+
+jobs:
+  generate-report:
+    name: Generate Report
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Install Python packages
+        run: pip3 install pandas numpy plotly yfinance babel dominate
+      - name: Generate Report
+        run: ./generate_report.py
+      - name: Get Date
+        id: get_date
+        run: echo "::set-output name=date::$(date -I)"
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.get_date.outputs.date }}
+          release_name: Report ${{ steps.get_date.outputs.date }}
+          draft: false
+          prerelease: false
+      - name: Upload Release Asset
+        id: upload-release-asset 
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./report.html
+          asset_name: Report_${{ steps.get_date.outputs.date }}
+          asset_content_type: text/html
