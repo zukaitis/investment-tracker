@@ -41,5 +41,5 @@ jobs:
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./report.html
-          asset_name: Report_${{ steps.get_date.outputs.date }}
+          asset_name: Report_${{ steps.get_date.outputs.date }}.html
           asset_content_type: text/html
