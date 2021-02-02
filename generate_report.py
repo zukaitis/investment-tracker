@@ -44,7 +44,7 @@ class Settings:
     currency = 'EUR'
     locale = 'en_US_POSIX'
     autofill_interval = '1d'
-    autofill_price_mark = 'Open'
+    autofill_price_mark = 'Close'
     theme = 'auto'
 
     def __setattr__(self, name, value):
@@ -477,7 +477,7 @@ def plot_historical_asset_data(input: pd.DataFrame) -> go.Figure:
         data['str_net_investment'] = data['net_investment'].apply(currency_str)
         data['str_return_received'] = data['return_received'].apply(currency_str)
         data['str_value'] = data['value'].apply(currency_str)
-        if (data['price'] != 0).any():
+        if ((data['price'] != 0) & (pd.notna(data['price']))).any():
             data['str_value'] += ('<br>Price: ' + data['price'].apply(currency_str)
                 + ' / Amt.: ' + data['amount'].apply(decimal_str))
 
