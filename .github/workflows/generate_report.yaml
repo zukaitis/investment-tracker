@@ -23,14 +23,14 @@ jobs:
         run: ./generate_report.py
       - name: Get Date
         id: get_date
-        run: echo "::set-output name=date::$(date -I)" && echo "::set-output name=datetime::$(date '+%F %T')"
+        run: echo "::set-output name=date::$(date -I)" && echo "::set-output name=datetime::$(date '+%F %T')" && echo "::set-output name=tag::$(date '+%FT%H%M%S')"
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.sha }}
+          tag_name: ${{ steps.get_date.outputs.tag }}
           release_name: Report ${{ steps.get_date.outputs.datetime }}
           draft: false
           prerelease: false
