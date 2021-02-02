@@ -29,7 +29,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ steps.get_date.outputs.datetime }}
+          tag_name: ${{ steps.get_date.outputs.date_time }}
           release_name: Report ${{ steps.get_date.outputs.datetime }}
           draft: false
           prerelease: false
