@@ -92,10 +92,10 @@ class Settings:
 def currency_str(value: float) -> str:
     if np.isnan(value) or np.isinf(value):
         return '?'
-    precision = 2 
-    if abs(value) < 0.0500:
-        precision = 4
-    elif abs(value) < 0.50:
+    precision = 4 
+    if abs(value) >= 0.50:
+        precision = 2
+    elif abs(value) >= 0.050:
         precision = 3
     return babel.numbers.format_currency(round(value, precision), settings.currency,
         locale=settings.locale, decimal_quantization=False)
@@ -111,9 +111,11 @@ def percentage_str(value: float) -> str:
     return babel.numbers.format_percent(round(value, precision), locale=settings.locale,
         decimal_quantization=False)
 
-def decimal_str(value: float) -> str:
+def decimal_str(value: float, precision: int = None) -> str:
     if np.isnan(value) or np.isinf(value):
         return '?'
+    if precision != None:
+        value = round(value, precision)
     return babel.numbers.format_decimal(value, locale=settings.locale)
 
 def date_str(date: datetime.date) -> str:
@@ -656,9 +658,9 @@ def append_overall_data_tabs(document: html.Document):
     tabs.append(html.Tab(html.Label('Funds invested', html.Value(currency_str(current_stats['net_investment'].sum()))),
         append_figures('net_investment', 'Funds invested')))
     if current_stats['return_received'].max() > 0:
-        tabs.append(html.Tab(html.Label('Return received', html.Value(currency_str(current_stats['return_received'].sum()))),
+        tabs.append(html.Tab(html.Label('Return received', html.Value(currency_str(current_stats['return_received'].sum()), value_change=currency_str(-52))),
             append_figures('return_received', 'Return received')))
-    tabs.append(html.Tab(html.Label('Net profit', html.Value(currency_str(current_stats['profit'].sum())).color()),
+    tabs.append(html.Tab(html.Label('Net profit', html.Value(currency_str(current_stats['profit'].sum()), value_change=currency_str(3.50)).color()),
         append_figures('profit', 'Net profit')))
     tabs.append(html.Tab(html.Label('Relative net profit', html.Value(percentage_str(current_stats['profit'].sum()/current_stats['net_investment_max'].sum())).color()),
         append_figures('relative_profit', 'Relative net profit')))

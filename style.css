@@ -139,6 +139,10 @@ label {
     color: var(--checked_tab_indicator_color);
 }
 
+.value_change {
+    font-size: 0.6em;
+}
+
 /*Media query*/
 @media only screen and (max-width: 900px) {
     label span {

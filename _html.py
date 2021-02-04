@@ -5,6 +5,9 @@ from dataclasses import dataclass
 import typing
 from pathlib import Path
 
+positive_color = 'green'
+negative_color = 'red'
+
 class _HtmlObject:
     def __init__(self):
         self._raw = ''
@@ -16,7 +19,6 @@ class Document:
     def __init__(self, title: str, css_variables: dict):
         self._document = dominate.document(title=title)
         self._document.head += raw('<meta charset="utf-8"/>')
-        #self._document.head += raw('<link rel="stylesheet" href="style.css">')
         self._document.head += raw('<style type=text/css>')
         self._append_css_variables_to_head(css_variables)
         self._append_file_to_head('style.css')
@@ -102,23 +104,39 @@ class Columns(_HtmlObject):
                     c.width = width
         return output
 
-@dataclass
-class Value:
-    value: str = ''
-    text_color: str = None
+class Value(_HtmlObject):
+    def __init__(self, value: str, text_color: str = None, value_change: str = None):
+        self.value = value
+        self.text_color = text_color
+        self.value_change = value_change
+
+    def __str__(self):
+        self._raw = f'<span'
+        self._raw += f' style="color:{self.text_color};">' if (self.text_color != None) else '>'
+        self._raw += f'{self.value}</span>'
+        if self.value_change != None:
+            symbol = '▾' if self._is_negative(self.value_change) else '▴'
+            color = negative_color if self._is_negative(self.value_change) else positive_color
+            self._raw += f'<span class="value_change" style="color:{color};">'
+            self._raw += f' {symbol}{self.value_change.replace("-", "")}</span>'
+        return self._raw
 
     def color(self):
-        if '-' in self.value:
-            self.text_color = 'red'
-        # check if there are digits other than 0 in string
-        elif any([str(d) in self.value for d in range(1, 10)]):
-            self.text_color = 'green'
+        if self._is_negative(self.value):
+            self.text_color = negative_color
+        elif self._is_not_zero(self.value):
+            self.text_color = positive_color
         return self
 
+    def _is_negative(self, value: str) -> bool:
+        return ('-' in value)
+
+    def _is_not_zero(self, value: str) -> bool:
+        # check if there are digits other than 0 in the string
+        return any([str(d) in value for d in range(1, 10)])
+
 class Label(_HtmlObject):
-    def __init__(self, name: str, value: Value = None):
+    def __init__(self, name: str, value: _HtmlObject = None):
         self._raw = f'<span class="label_name">{name}</span>'
         if value != None:
-            self._raw += f'<br><span'
-            self._raw += f' style=color:{value.text_color}>' if (value.text_color != None) else '>'
-            self._raw += f'{value.value}</span>'
+            self._raw += f'<br>{value}'
