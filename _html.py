@@ -23,6 +23,21 @@ class Document:
         self._append_css_variables_to_head(css_variables)
         self._append_file_to_head('style.css')
         self._document.head += raw('</style>')
+        self._document += raw('<div class="fixed_button_area">')
+        self._document += raw('<div class="button">')
+        self._document += raw('<input type="checkbox" id="pompa" name="pompa">')
+        self._document += raw('<label for="pompa" class="button_image0">')
+        self._document += raw('<div class="button_image_padding>"')
+        self._document += raw(Path('calendar_month_nu.svg').read_text())
+        self._document += raw('</div>')
+        self._document += raw('</label>')
+        self._document += raw('<label for="pompa" class="button_image1">')
+        self._document += raw('<div class="button_image_padding>"')
+        self._document += raw(Path('calendar_day_nu.svg').read_text())
+        self._document += raw('</div>')
+        self._document += raw('</label>')
+        self._document += raw('</div>')
+        self._document += raw('</div>')
 
     def append(self, obj: typing.Union[_HtmlObject, str]):
         self._document += raw(str(obj))
@@ -59,7 +74,7 @@ class TabContainer(_HtmlObject):
             tab_name = f'{container_name}_tab{i}'
             self._raw += f'<input id="{tab_name}" type="radio" name="{container_name}"'
             self._raw += f' checked>' if tab[i].checked else f'>'
-            self._raw += f'<label style="width:{width:.2f}%" for="{tab_name}">'
+            self._raw += f'<label class="tab_label" style="width:{width:.2f}%" for="{tab_name}">'
             if tab[i].label != None:
                 self._raw += str(tab[i].label)
             self._raw += '</label>'
@@ -104,6 +119,10 @@ class Columns(_HtmlObject):
                     c.width = width
         return output
 
+class ValueChange(_HtmlObject):
+    def __init__(self, values: typing.List[str], button_identifier: str):
+        self._raw = ''
+
 class Value(_HtmlObject):
     def __init__(self, value: str, text_color: str = None, value_change: str = None):
         self.value = value
@@ -140,3 +159,37 @@ class Label(_HtmlObject):
         self._raw = f'<span class="label_name">{name}</span>'
         if value != None:
             self._raw += f'<br>{value}'
+
+button_count = 0
+
+class Button(_HtmlObject):
+    def __init__(self, images: typing.List[str], identifier: str):
+        self.identifier = identifier
+        self._raw = '<div class="button">'
+        self._raw += f'<input type="checkbox" id="{identifier}" name="{identifier}">'
+        for i in range(len(images)):
+            self._raw += f'label for="{identifier}" class="{identifier}_img{i}"'
+            self._raw += '<div class="button_image_padding>"'
+            self._raw += Path(images[i]).read_text()
+            self._raw += '</div>'
+            self._raw += '</label>'
+        self._raw += '</div>'
+
+class FixedButtons(_HtmlObject):
+    def __init__(self, buttons: typing.List[Button]):
+        self._raw = '<div class="fixed_button_area">'
+        self._raw += '<style type=text/css>'
+        for b in buttons:
+            id = b.identifier
+            self._raw += f'input#{id} {{ display: none; }}'
+            self._raw += f'.{id}_img0 {{ display: none; }}'
+            self._raw += f'input#{id}:checked ~ .{id}_img0 {{ display: initial; }}'
+            self._raw += f'input#{id}:checked ~ .{id}_img1 {{ display: none; }}'
+        self._raw += '</style>'
+
+        self._raw += '<div class="fixed_button_area">'
+        for b in buttons:
+            self._raw += b
+        self._raw += '</div>'
+
+

@@ -24,6 +24,12 @@ jobs:
       - name: Get Date
         id: get_date
         run: echo "::set-output name=date::$(date -I)" && echo "::set-output name=datetime::$(date '+%F %T')" && echo "::set-output name=tag::$(date '+%FT%H%M%S')"
+      - name: Delete older releases
+        uses: dev-drprasad/delete-older-releases@v0.1.0
+        with:
+            keep_latest: 6  # specify how many old releases you want to keep here
+        env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1

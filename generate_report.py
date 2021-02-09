@@ -46,6 +46,8 @@ class Settings:
     autofill_interval = '1d'
     autofill_price_mark = 'Close'
     theme = 'auto'
+    value_change_period = '3d'
+    total_value_change_display_type = 'daily'
 
     def __setattr__(self, name, value):
         if name == 'owner':
@@ -80,6 +82,19 @@ class Settings:
                 self.__dict__[name] = value
             else:
                 print_warning(f'Unknown theme - "{value}". Allowed themes: {allowed}')
+        elif name == 'value_change_period':
+            allowed = ['1d', '5d', '1wk', '1mo', '3mo']
+            if True: #value in allowed:
+                self.__dict__[name] = value
+            else:
+                print_warning(f'Unknown interval - "{value}". Allowed intervals: {allowed}')
+        elif name == 'total_value_change_display_type':
+            allowed = ['daily', 'monthly']
+            if value in allowed:
+                self.__dict__[name] = value
+            else:
+                print_warning(
+                    f'Unknown value change display type - "{value}". Allowed types: {allowed}')
         elif name not in self:
             print_warning(f'No such setting - "{name}"')
         else:
@@ -804,8 +819,8 @@ if __name__ == '__main__':
     print('Generating report')
     report.append(f'<h1>{title}</h1>')
     report.append(f'<h3>Data from {date_str(earliest_date)} to {date_str(latest_date)}</h3>')
-    append_overall_data_tabs(report)
-    append_asset_data_tabs(report)
+    #append_overall_data_tabs(report)
+    #append_asset_data_tabs(report)
 
     report.append(f'<p class="footer">Report generated on {date_str(datetime.date.today())}, '
         f'using open source script: '

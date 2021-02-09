@@ -50,7 +50,6 @@ h2 {
 .tab_container {
     width: 98%;
     margin: 0 auto;
-    position: relative;
     background: var(--tab_background_color);
     min-width: 50em;
     margin-bottom: 2em;
@@ -62,7 +61,7 @@ input, section {
     display: none;
 }
 
-label {
+.tab_label {
     font-weight: 700;
     font-size: 1.2em;
     display: block;
@@ -108,10 +107,15 @@ label {
 #container2_tab8:checked ~ #container2_content8,
 #container2_tab9:checked ~ #container2_content9 {
     display: block;
-    background: var(--tab_background_color);
-    color: var(--text_color);
-    border-bottom: 2px solid var(--tab_shadow_color);
 }
+
+input#pompa { display: none; }
+
+.button_image0 { display: none; }
+
+input#pompa:checked ~ .button_image0 { display: initial; }
+
+input#pompa:checked ~ .button_image1 { display: none; }
 
 .tab_container .tab-content p,
 .tab_container .tab-content h3,
@@ -143,6 +147,25 @@ label {
     font-size: 0.6em;
 }
 
+.fixed_button_area {
+    top: 2em;
+    right: 2%;
+    position: fixed;
+    z-index: 100;
+}
+
+.button {
+    width: 3em;
+    height: 3em;
+    /* padding: 0.6em; */
+    background-color: var(--hover_tab_indicator_color);
+    border-radius: 50%;
+}
+
+.button_image_padding {
+    padding: 0.6em;
+}
+
 /*Media query*/
 @media only screen and (max-width: 900px) {
     label span {
@@ -154,17 +177,6 @@ label {
     }
 }
 
-.distribution_figure,
-.yearly_figure {
-    float:left;
-    width:30%;
-}
-
-.historical_figure {
-    float:left;
-    width:70%;
-}
-
 .column {
     font-size: 1.2em;
     float: left;
@@ -172,16 +184,6 @@ label {
     color: var(--text_color);
     text-align: center;
     padding-top: 0.5em;
-}
-
-.asset_stat_table {
-    font-size: 1.2em;
-    float: left;
-    width: 20%;
-    color: var(--text_color);
-    text-align: center;
-    padding-top: 0.5em;
-    padding-bottom: 0.5em;
 }
 
 /*Content Animation*/
