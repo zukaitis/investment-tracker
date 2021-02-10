@@ -109,6 +109,26 @@ input, section {
     display: block;
 }
 
+.button_image0,
+.button_image1,
+.button {
+    top: 2em;
+    right: 2%;
+    position: fixed;
+    z-index: 100;
+
+    width: 3em;
+    height: 3em;
+    /* padding: 0.6em; */
+    background-color: var(--hover_tab_indicator_color);
+    border-radius: 50%;
+    user-select: none;
+}
+
+.button_image_padding {
+    padding: 0.6em;
+}
+
 input#pompa { display: none; }
 
 .button_image0 { display: none; }
@@ -125,6 +145,7 @@ input#pompa:checked ~ .button_image1 { display: none; }
     animation: fadeInScale 0.2s ease-in-out;
     overflow: hidden
 }
+
 .tab_container .tab-content h3    {
     text-align: center;
 }
@@ -143,7 +164,7 @@ input#pompa:checked ~ .button_image1 { display: none; }
     color: var(--checked_tab_indicator_color);
 }
 
-.value_change {
+.value_changes {
     font-size: 0.6em;
 }
 
@@ -154,17 +175,11 @@ input#pompa:checked ~ .button_image1 { display: none; }
     z-index: 100;
 }
 
-.button {
-    width: 3em;
-    height: 3em;
-    /* padding: 0.6em; */
-    background-color: var(--hover_tab_indicator_color);
-    border-radius: 50%;
-}
+.daily_change { display: none; }
 
-.button_image_padding {
-    padding: 0.6em;
-}
+#pompa:checked ~ * .daily_change { display: initial; }
+
+#pompa:checked ~ * .monthly_change { display: none; }
 
 /*Media query*/
 @media only screen and (max-width: 900px) {

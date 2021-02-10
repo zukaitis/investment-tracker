@@ -668,7 +668,7 @@ def append_asset_data_view(data: pd.DataFrame):
     return output
 
 def append_overall_data_tabs(document: html.Document):
-    tabs = [html.Tab(html.Label('Value', html.Value(currency_str(current_stats['value'].sum()))),
+    tabs = [html.Tab(html.Label('Value', html.Value(currency_str(current_stats['value'].sum()), value_change=html.ValueChange('-0', '4.20420'))),
         append_figures('value', 'Value'), checked=True)]
     tabs.append(html.Tab(html.Label('Funds invested', html.Value(currency_str(current_stats['net_investment'].sum()))),
         append_figures('net_investment', 'Funds invested')))
@@ -819,7 +819,7 @@ if __name__ == '__main__':
     print('Generating report')
     report.append(f'<h1>{title}</h1>')
     report.append(f'<h3>Data from {date_str(earliest_date)} to {date_str(latest_date)}</h3>')
-    #append_overall_data_tabs(report)
+    append_overall_data_tabs(report)
     #append_asset_data_tabs(report)
 
     report.append(f'<p class="footer">Report generated on {date_str(datetime.date.today())}, '

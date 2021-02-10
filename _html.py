@@ -23,21 +23,17 @@ class Document:
         self._append_css_variables_to_head(css_variables)
         self._append_file_to_head('style.css')
         self._document.head += raw('</style>')
-        self._document += raw('<div class="fixed_button_area">')
-        self._document += raw('<div class="button">')
         self._document += raw('<input type="checkbox" id="pompa" name="pompa">')
         self._document += raw('<label for="pompa" class="button_image0">')
-        self._document += raw('<div class="button_image_padding>"')
+        self._document += raw('<div class="button_image_padding"')
         self._document += raw(Path('calendar_month_nu.svg').read_text())
         self._document += raw('</div>')
         self._document += raw('</label>')
         self._document += raw('<label for="pompa" class="button_image1">')
-        self._document += raw('<div class="button_image_padding>"')
+        self._document += raw('<div class="button_image_padding"')
         self._document += raw(Path('calendar_day_nu.svg').read_text())
         self._document += raw('</div>')
         self._document += raw('</label>')
-        self._document += raw('</div>')
-        self._document += raw('</div>')
 
     def append(self, obj: typing.Union[_HtmlObject, str]):
         self._document += raw(str(obj))
@@ -119,12 +115,30 @@ class Columns(_HtmlObject):
                     c.width = width
         return output
 
+def _is_negative(value: str) -> bool:
+        return ('-' in value)
+
+def _is_not_zero(value: str) -> bool:
+    # check if there are digits other than 0 in the string
+    return any([str(d) in value for d in range(1, 10)])
+
 class ValueChange(_HtmlObject):
-    def __init__(self, values: typing.List[str], button_identifier: str):
-        self._raw = ''
+    def __init__(self, daily_change: str = None, monthly_change: str = None):
+        self._raw = '<span class="value_changes">'
+        if daily_change != None:
+            self._append_span(daily_change, 'daily_change')
+        if monthly_change != None:
+            self._append_span(monthly_change, 'monthly_change')
+        self._raw += '</span>'
+
+    def _append_span(self, value_change: str, css_class: str):
+        symbol = '▾' if _is_negative(value_change) else '▴'
+        color = negative_color if _is_negative(value_change) else positive_color
+        self._raw += f'<span class="{css_class}" style="color:{color};">'
+        self._raw += f' {symbol}{value_change.replace("-", "")}</span>'
 
 class Value(_HtmlObject):
-    def __init__(self, value: str, text_color: str = None, value_change: str = None):
+    def __init__(self, value: str, text_color: str = None, value_change: ValueChange = None):
         self.value = value
         self.text_color = text_color
         self.value_change = value_change
@@ -134,25 +148,15 @@ class Value(_HtmlObject):
         self._raw += f' style="color:{self.text_color};">' if (self.text_color != None) else '>'
         self._raw += f'{self.value}</span>'
         if self.value_change != None:
-            symbol = '▾' if self._is_negative(self.value_change) else '▴'
-            color = negative_color if self._is_negative(self.value_change) else positive_color
-            self._raw += f'<span class="value_change" style="color:{color};">'
-            self._raw += f' {symbol}{self.value_change.replace("-", "")}</span>'
+            self._raw += str(self.value_change)
         return self._raw
 
     def color(self):
-        if self._is_negative(self.value):
+        if _is_negative(self.value):
             self.text_color = negative_color
-        elif self._is_not_zero(self.value):
+        elif _is_not_zero(self.value):
             self.text_color = positive_color
         return self
-
-    def _is_negative(self, value: str) -> bool:
-        return ('-' in value)
-
-    def _is_not_zero(self, value: str) -> bool:
-        # check if there are digits other than 0 in the string
-        return any([str(d) in value for d in range(1, 10)])
 
 class Label(_HtmlObject):
     def __init__(self, name: str, value: _HtmlObject = None):
