@@ -110,23 +110,23 @@ input, section {
 }
 
 .button_image0,
-.button_image1,
-.button {
-    top: 2em;
+.button_image1 {
     right: 2%;
+    top: 2em;
     position: fixed;
     z-index: 100;
-
     width: 3em;
     height: 3em;
-    /* padding: 0.6em; */
+    padding: 0.6em;
     background-color: var(--hover_tab_indicator_color);
     border-radius: 50%;
     user-select: none;
+    opacity: 0.2;
 }
 
-.button_image_padding {
-    padding: 0.6em;
+.button_image0:hover,
+.button_image1:hover {
+    opacity: 1;
 }
 
 input#pompa { display: none; }
@@ -177,9 +177,9 @@ input#pompa:checked ~ .button_image1 { display: none; }
 
 .daily_change { display: none; }
 
-#pompa:checked ~ * .daily_change { display: initial; }
+#value_change_button:checked ~ * .daily_change { display: initial; }
 
-#pompa:checked ~ * .monthly_change { display: none; }
+#value_change_button:checked ~ * .monthly_change { display: none; }
 
 /*Media query*/
 @media only screen and (max-width: 900px) {

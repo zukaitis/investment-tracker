@@ -5,8 +5,22 @@ from dataclasses import dataclass
 import typing
 from pathlib import Path
 
-positive_color = 'green'
-negative_color = 'red'
+_positive_color = 'green'
+_negative_color = 'red'
+
+_button_css = '''{
+    right: 2%;
+    top: 2em;
+    position: fixed;
+    z-index: 100;
+    width: 3em;
+    height: 3em;
+    padding: 0.6em;
+    background-color: var(--hover_tab_indicator_color);
+    border-radius: 50%;
+    user-select: none;
+    opacity: 0.2;
+}'''
 
 class _HtmlObject:
     def __init__(self):
@@ -23,17 +37,13 @@ class Document:
         self._append_css_variables_to_head(css_variables)
         self._append_file_to_head('style.css')
         self._document.head += raw('</style>')
-        self._document += raw('<input type="checkbox" id="pompa" name="pompa">')
-        self._document += raw('<label for="pompa" class="button_image0">')
-        self._document += raw('<div class="button_image_padding"')
-        self._document += raw(Path('calendar_month_nu.svg').read_text())
-        self._document += raw('</div>')
-        self._document += raw('</label>')
-        self._document += raw('<label for="pompa" class="button_image1">')
-        self._document += raw('<div class="button_image_padding"')
-        self._document += raw(Path('calendar_day_nu.svg').read_text())
-        self._document += raw('</div>')
-        self._document += raw('</label>')
+        # self._document += raw('<input type="checkbox" id="pompa" name="pompa">')
+        # self._document += raw('<label for="pompa" class="button_image0">')
+        # self._document += raw(Path('calendar_month_nu.svg').read_text())
+        # self._document += raw('</label>')
+        # self._document += raw('<label for="pompa" class="button_image1">')
+        # self._document += raw(Path('calendar_day_nu.svg').read_text())
+        # self._document += raw('</label>')
 
     def append(self, obj: typing.Union[_HtmlObject, str]):
         self._document += raw(str(obj))
@@ -133,7 +143,7 @@ class ValueChange(_HtmlObject):
 
     def _append_span(self, value_change: str, css_class: str):
         symbol = '▾' if _is_negative(value_change) else '▴'
-        color = negative_color if _is_negative(value_change) else positive_color
+        color = _negative_color if _is_negative(value_change) else _positive_color
         self._raw += f'<span class="{css_class}" style="color:{color};">'
         self._raw += f' {symbol}{value_change.replace("-", "")}</span>'
 
@@ -153,9 +163,9 @@ class Value(_HtmlObject):
 
     def color(self):
         if _is_negative(self.value):
-            self.text_color = negative_color
+            self.text_color = _negative_color
         elif _is_not_zero(self.value):
-            self.text_color = positive_color
+            self.text_color = _positive_color
         return self
 
 class Label(_HtmlObject):
@@ -164,36 +174,23 @@ class Label(_HtmlObject):
         if value != None:
             self._raw += f'<br>{value}'
 
-button_count = 0
-
 class Button(_HtmlObject):
-    def __init__(self, images: typing.List[str], identifier: str):
-        self.identifier = identifier
-        self._raw = '<div class="button">'
-        self._raw += f'<input type="checkbox" id="{identifier}" name="{identifier}">'
-        for i in range(len(images)):
-            self._raw += f'label for="{identifier}" class="{identifier}_img{i}"'
-            self._raw += '<div class="button_image_padding>"'
-            self._raw += Path(images[i]).read_text()
-            self._raw += '</div>'
-            self._raw += '</label>'
-        self._raw += '</div>'
+    def __init__(self, image_initial: str, image_alternate: str, identifier: str):
+        # adding css styling of button
+        self._raw = f'<style type=text/css>'
+        self._raw += f'.{identifier}_unchecked, .{identifier}_checked {_button_css}'
+        self._raw += f'.{identifier}_unchecked:hover, .{identifier}_checked:hover {{opacity: 1;}}'
+        self._raw += f'input#{identifier} {{ display: none; }}'
+        self._raw += f'.{identifier}_unchecked {{ display: none; }}'
+        self._raw += f'input#{identifier}:checked ~ .{identifier}_unchecked {{display: initial;}}'
+        self._raw += f'input#{identifier}:checked ~ .{identifier}_checked {{ display: none; }}'
+        self._raw += f'</style>'
 
-class FixedButtons(_HtmlObject):
-    def __init__(self, buttons: typing.List[Button]):
-        self._raw = '<div class="fixed_button_area">'
-        self._raw += '<style type=text/css>'
-        for b in buttons:
-            id = b.identifier
-            self._raw += f'input#{id} {{ display: none; }}'
-            self._raw += f'.{id}_img0 {{ display: none; }}'
-            self._raw += f'input#{id}:checked ~ .{id}_img0 {{ display: initial; }}'
-            self._raw += f'input#{id}:checked ~ .{id}_img1 {{ display: none; }}'
-        self._raw += '</style>'
-
-        self._raw += '<div class="fixed_button_area">'
-        for b in buttons:
-            self._raw += b
-        self._raw += '</div>'
-
-
+        # adding html
+        self._raw += f'<input type="checkbox" id="{identifier}" name="{identifier}" checked>'
+        self._raw += f'<label for="{identifier}" class="{identifier}_unchecked">'
+        self._raw += Path(image_initial).read_text()
+        self._raw += f'</label>'
+        self._raw += f'<label for="{identifier}" class="{identifier}_checked">'
+        self._raw += Path(image_alternate).read_text()
+        self._raw += f'</label>'
