@@ -133,12 +133,12 @@ def _is_not_zero(value: str) -> bool:
     return any([str(d) in value for d in range(1, 10)])
 
 class ValueChange(_HtmlObject):
-    def __init__(self, daily_change: str = None, monthly_change: str = None):
+    def __init__(self, daily: str = None, monthly: str = None):
         self._raw = '<span class="value_changes">'
-        if daily_change != None:
-            self._append_span(daily_change, 'daily_change')
-        if monthly_change != None:
-            self._append_span(monthly_change, 'monthly_change')
+        if daily != None:
+            self._append_span(daily, 'daily_change')
+        if monthly != None:
+            self._append_span(monthly, 'monthly_change')
         self._raw += '</span>'
 
     def _append_span(self, value_change: str, css_class: str):
@@ -148,10 +148,10 @@ class ValueChange(_HtmlObject):
         self._raw += f' {symbol}{value_change.replace("-", "")}</span>'
 
 class Value(_HtmlObject):
-    def __init__(self, value: str, text_color: str = None, value_change: ValueChange = None):
+    def __init__(self, value: str, textcolor: str = None, valuechange: ValueChange = None):
         self.value = value
-        self.text_color = text_color
-        self.value_change = value_change
+        self.text_color = textcolor
+        self.value_change = valuechange
 
     def __str__(self):
         self._raw = f'<span'

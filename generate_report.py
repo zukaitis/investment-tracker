@@ -46,8 +46,7 @@ class Settings:
     autofill_interval = '1d'
     autofill_price_mark = 'Close'
     theme = 'auto'
-    value_change_period = '3d'
-    total_value_change_display_type = 'daily'
+    value_change_span_days = 3
 
     def __setattr__(self, name, value):
         if name == 'owner':
@@ -82,19 +81,11 @@ class Settings:
                 self.__dict__[name] = value
             else:
                 print_warning(f'Unknown theme - "{value}". Allowed themes: {allowed}')
-        elif name == 'value_change_period':
-            allowed = ['1d', '5d', '1wk', '1mo', '3mo']
-            if True: #value in allowed:
+        elif name == 'value_change_span_days':
+            if (type(value) is int) and (value > 0):
                 self.__dict__[name] = value
             else:
-                print_warning(f'Unknown interval - "{value}". Allowed intervals: {allowed}')
-        elif name == 'total_value_change_display_type':
-            allowed = ['daily', 'monthly']
-            if value in allowed:
-                self.__dict__[name] = value
-            else:
-                print_warning(
-                    f'Unknown value change display type - "{value}". Allowed types: {allowed}')
+                print_warning(f'Value change span has to be a positive number')
         elif name not in self:
             print_warning(f'No such setting - "{name}"')
         else:
@@ -164,6 +155,49 @@ def percentage_tick_suffix() -> str:
     if string[-2] == ' ':
         return ' %'
     return '%'
+
+def calculate_value_change(values: pd.Series,
+        iscurrency: bool = False, ispercentage: bool = False) -> html.ValueChange:
+    if len(values) < 2:  # can't have value changes with 1 or 0 values
+        return html.ValueChange()
+
+    daily_change = None
+    monthly_change = None
+    data = values.copy().sort_index()
+
+    delta = datetime.timedelta(days=settings.value_change_span_days)
+    # check how recent the data is
+    if ((data.index[-1] - data.index[-2]) <= delta) and ((latest_date - data.index[-1]) <= delta):
+        change = data.values[-1] - data.values[-2]
+        if change != 0:
+            if iscurrency:
+                daily_change = currency_str(change)
+            elif ispercentage:
+                daily_change = percentage_str(change)
+            else:
+                daily_change = decimal_str(change)
+
+    data = data.to_frame()
+    data['year'] = data.index.year
+    data['month'] = data.index.month
+    monthly = data.groupby(['year', 'month']).last().reset_index()
+    monthly.columns = ['year', 'month', 'value']
+    monthly['m'] = monthly['year'] * 12 + monthly['month']  # month number for easier operations
+    latest_m = latest_date.year * 12 + latest_date.month
+
+    if (((monthly.loc[monthly.index[-1], 'm'] - monthly.loc[monthly.index[-2], 'm']) == 1) and
+            (latest_m - monthly.loc[monthly.index[-1], 'm'] <= 1)):
+        change = monthly.loc[monthly.index[-1], 'value'] - monthly.loc[monthly.index[-2], 'value']
+        if change != 0:
+            if iscurrency:
+                monthly_change = currency_str(change)
+            elif ispercentage:
+                monthly_change = percentage_str(change)
+            else:
+                monthly_change = decimal_str(change)
+
+    return html.ValueChange(daily=daily_change, monthly=monthly_change)
+
 
 def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
     data = input_data.copy()
@@ -646,36 +680,64 @@ def append_figures(statistic: str, label_text: str) -> html.Columns:
         html.Column(content=historical.to_html(
             full_html=False, include_plotlyjs=True))])
 
-def append_asset_data_view(data: pd.DataFrame):
+def append_asset_data_view(input: pd.DataFrame):
+    data = input.copy()
+    last_row = data.iloc[-1].to_dict()
 
-    name = data.loc[data.index[-1], 'name']
-    if 'symbol' in data.columns:
-        if pd.notnull(data.loc[data.index[-1], 'symbol']):
-            name += f" ({data.loc[data.index[-1], 'symbol']})"
-    if 'account' in data.columns:
-        name += f"<br>{data.loc[data.index[-1], 'account']}"
-    output = f'<h2>{name}</h2>'
+    title = last_row['name']
+    if ('symbol' in last_row) and (pd.notnull(last_row['symbol'])):
+        title += f" ({last_row['symbol']})"
+    if 'account' in last_row:
+        title += f"<br>{last_row['account']}"
+    output = f'<h2>{title}</h2>'
 
-    statistics = [html.Label('Value', html.Value(currency_str(data.loc[data.index[-1], 'value'])))]
-    statistics.append(html.Label('Funds invested', html.Value(currency_str(data.loc[data.index[-1], 'net_investment']))))
-    if data.loc[data.index[-1], 'return_received'] != 0:
-        statistics.append(html.Label('Return received', html.Value(currency_str(data.loc[data.index[-1], 'return_received']))))
-    statistics.append(html.Label('Net profit', html.Value(currency_str(data.loc[data.index[-1], 'profit'])).color()))
-    statistics.append(html.Label('Relative net profit', html.Value(percentage_str(data.loc[data.index[-1], 'relative_profit'])).color()))
+    statistics = []
+
+    if data['value'].max() != 0:
+        data['value_change'] = data['profit'] - data['return_received']
+        c = calculate_value_change(data.set_index('date')['value_change'], iscurrency=True)
+        statistics.append(html.Label('Value',
+            html.Value(currency_str(last_row['value']), valuechange=c)))
+
+    c = calculate_value_change(data.set_index('date')['net_investment'], iscurrency=True)
+    statistics.append(html.Label('Funds invested',
+        html.Value(currency_str(last_row['net_investment']), valuechange=c)))
+
+    if last_row['return_received'] != 0:
+        c = calculate_value_change(data.set_index('date')['return_received'], iscurrency=True)
+        statistics.append(html.Label('Return received', html.Value(
+            currency_str(last_row['return_received']), valuechange=c)))
+
+    c = calculate_value_change(data.set_index('date')['profit'], iscurrency=True)
+    statistics.append(html.Label('Net profit',
+        html.Value(currency_str(last_row['profit']), valuechange=c).color()))
+
+    c = calculate_value_change(data.set_index('date')['relative_profit'], ispercentage=True)
+    statistics.append(html.Label('Relative net profit',
+        html.Value(percentage_str(last_row['relative_profit']), valuechange=c).color()))
+
     output += f'{html.Columns(statistics)}'
-    if (len(data) > 1):
-        output += f'{html.Columns([html.Column(width=30, content=plot_yearly_asset_data(data).to_html(full_html=False, include_plotlyjs=True)), html.Column(content=plot_historical_asset_data(data).to_html(full_html=False, include_plotlyjs=True))])}'
+
+    if len(data) > 1:
+        yearly_figure = plot_yearly_asset_data(data).to_html(
+            full_html=False, include_plotlyjs=True)
+        historical_figure = plot_historical_asset_data(data).to_html(
+            full_html=False, include_plotlyjs=True)
+        figures = html.Columns([html.Column(width=30, content=yearly_figure),
+            html.Column(content=historical_figure)])
+        output += f'{figures}'
+
     return output
 
 def append_overall_data_tabs(document: html.Document):
-    tabs = [html.Tab(html.Label('Value', html.Value(currency_str(current_stats['value'].sum()), value_change=html.ValueChange('-0', '4.20420'))),
+    tabs = [html.Tab(html.Label('Value', html.Value(currency_str(current_stats['value'].sum()), valuechange=html.ValueChange('-0', '4.20420'))),
         append_figures('value', 'Value'), checked=True)]
     tabs.append(html.Tab(html.Label('Funds invested', html.Value(currency_str(current_stats['net_investment'].sum()))),
         append_figures('net_investment', 'Funds invested')))
     if current_stats['return_received'].max() > 0:
-        tabs.append(html.Tab(html.Label('Return received', html.Value(currency_str(current_stats['return_received'].sum()), value_change=currency_str(-52))),
+        tabs.append(html.Tab(html.Label('Return received', html.Value(currency_str(current_stats['return_received'].sum()), valuechange=currency_str(-52))),
             append_figures('return_received', 'Return received')))
-    tabs.append(html.Tab(html.Label('Net profit', html.Value(currency_str(current_stats['profit'].sum()), value_change=currency_str(3.50)).color()),
+    tabs.append(html.Tab(html.Label('Net profit', html.Value(currency_str(current_stats['profit'].sum()), valuechange=currency_str(3.50)).color()),
         append_figures('profit', 'Net profit')))
     tabs.append(html.Tab(html.Label('Relative net profit', html.Value(percentage_str(current_stats['profit'].sum()/current_stats['net_investment_max'].sum())).color()),
         append_figures('relative_profit', 'Relative net profit')))
