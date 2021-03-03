@@ -663,9 +663,9 @@ def configure_historical_dataview(figure: go.Figure, timerange: datetime.timedel
     figure.update_layout(margin=dict(l=10, r=10, t=20, b=10))
     figure.update_layout(xaxis=dict(title=dict(text='')), yaxis=dict(title=dict(text='')))
 
-def append_figures(statistic: str, label_text: str) -> html.Columns:
+def get_overall_figures(statistic: str, label_text: str) -> html.Columns:
     sunburst = go.Figure(plot_sunburst(current_stats, statistic, label_text))
-    sunburst = sunburst.update_traces(insidetextorientation='radial')
+    sunburst.update_traces(insidetextorientation='radial')
     sunburst.update_layout(margin=dict(l=10, r=10, t=10, b=10))
 
     if statistic == 'relative_profit':
@@ -693,7 +693,7 @@ def append_asset_data_view(input: pd.DataFrame):
 
     statistics = []
 
-    if data['value'].max() != 0:
+    if data['value'].any() != 0:
         data['value_change'] = data['profit'] - data['return_received']
         c = calculate_value_change(data.set_index('date')['value_change'], iscurrency=True)
         statistics.append(html.Label('Value',
@@ -730,21 +730,29 @@ def append_asset_data_view(input: pd.DataFrame):
     return output
 
 def append_overall_data_tabs(document: html.Document):
-    tabs = [html.Tab(html.Label('Value', html.Value(currency_str(current_stats['value'].sum()), valuechange=html.ValueChange('-0', '4.20420'))),
-        append_figures('value', 'Value'), checked=True)]
+    total = calculate_total_historical_data(assets[assets['id'] == current_stats['id'].any()])
+    last_row = total.iloc[-1].to_dict()
+
+    tabs = []
+    if assets['value'].any() != 0:
+        change = calculate_value_change(total.set_index('date')['value'], iscurrency=True)
+        label = html.Label('Value', html.Value(currency_str(last_row['value']),
+            valuechange=change))
+        content = get_overall_figures('value', 'Value')
+        tabs.append(html.Tab(label, content, checked=True))
     tabs.append(html.Tab(html.Label('Funds invested', html.Value(currency_str(current_stats['net_investment'].sum()))),
-        append_figures('net_investment', 'Funds invested')))
-    if current_stats['return_received'].max() > 0:
+        get_overall_figures('net_investment', 'Funds invested')))
+    if assets['return_received'].any() > 0:
         tabs.append(html.Tab(html.Label('Return received', html.Value(currency_str(current_stats['return_received'].sum()), valuechange=currency_str(-52))),
-            append_figures('return_received', 'Return received')))
+            get_overall_figures('return_received', 'Return received')))
     tabs.append(html.Tab(html.Label('Net profit', html.Value(currency_str(current_stats['profit'].sum()), valuechange=currency_str(3.50)).color()),
-        append_figures('profit', 'Net profit')))
+        get_overall_figures('profit', 'Net profit')))
     tabs.append(html.Tab(html.Label('Relative net profit', html.Value(percentage_str(current_stats['profit'].sum()/current_stats['net_investment_max'].sum())).color()),
-        append_figures('relative_profit', 'Relative net profit')))
+        get_overall_figures('relative_profit', 'Relative net profit')))
 
     document.append(html.TabContainer(tabs))
 
-def calculate_total_historical_data(input: pd.DataFrame, name: str) -> pd.DataFrame:
+def calculate_total_historical_data(input: pd.DataFrame, name: str = 'Total') -> pd.DataFrame:
     data = input.copy()
     group_assets = data['id'].unique()
     all_dates = data.groupby('date').tail(1)['date']
@@ -838,7 +846,7 @@ if __name__ == '__main__':
                 assets = assets.append(data)
 
     assets['account'] = assets['account'].fillna(' ')  # empty string doesn't work
-    assets['id'] = assets['group'] + assets['account'] + assets['name']
+    assets['id'] = assets['group'] + assets['account'] + assets['name']  # + assets['symbol']
     group_by_name = assets.groupby('id')[['id', 'name', 'group', 'account', 'value']].tail(1)
     group_by_name.sort_values(by=['value'], inplace=True, ascending=False)
     group_by_name = group_by_name.drop(columns=['value'])
@@ -860,8 +868,12 @@ if __name__ == '__main__':
     earliest_date = min(assets['date'])
     latest_date = max(assets['date'])
 
-    current_stats = assets.groupby('id')[['id', 'name', 'symbol', 'group', 'account', 'net_investment', 'net_investment_max', 'return_received', 'value', 'profit', 'relative_profit', 'color', 'date']].tail(1)
-    current_stats = current_stats[current_stats['date'] > latest_date - pd.DateOffset(months=6)]  # TODO: take months value from settings
+    current_stats = assets.groupby('id').tail(1)
+    for i in current_stats['id']:
+        if assets.loc[i == assets['id'], 'value'].any() != 0:
+            if current_stats.loc[i == current_stats['id'], 'value'].any() == 0:
+                # drop assets, which had non-zero value, but were sold
+                current_stats = current_stats[i != current_stats['id']]
 
     monthly_data = calculate_monthly_values(assets)
 
