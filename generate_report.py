@@ -730,25 +730,43 @@ def append_asset_data_view(input: pd.DataFrame):
     return output
 
 def append_overall_data_tabs(document: html.Document):
-    total = calculate_total_historical_data(assets[assets['id'] == current_stats['id'].any()])
+    # calculate total using only currently active values
+    total = calculate_total_historical_data(assets[assets['id'].isin(current_stats['id'])])
     last_row = total.iloc[-1].to_dict()
 
     tabs = []
-    if assets['value'].any() != 0:
+    if assets['value'].any() > 0:
         change = calculate_value_change(total.set_index('date')['value'], iscurrency=True)
         label = html.Label('Value', html.Value(currency_str(last_row['value']),
             valuechange=change))
         content = get_overall_figures('value', 'Value')
         tabs.append(html.Tab(label, content, checked=True))
-    tabs.append(html.Tab(html.Label('Funds invested', html.Value(currency_str(current_stats['net_investment'].sum()))),
-        get_overall_figures('net_investment', 'Funds invested')))
+
+    change = calculate_value_change(total.set_index('date')['net_investment'], iscurrency=True)
+    label = html.Label('Funds invested', html.Value(currency_str(last_row['net_investment']),
+        valuechange=change))
+    content = get_overall_figures('net_investment', 'Funds invested')
+    tabs.append(html.Tab(label, content))
+
     if assets['return_received'].any() > 0:
-        tabs.append(html.Tab(html.Label('Return received', html.Value(currency_str(current_stats['return_received'].sum()), valuechange=currency_str(-52))),
-            get_overall_figures('return_received', 'Return received')))
-    tabs.append(html.Tab(html.Label('Net profit', html.Value(currency_str(current_stats['profit'].sum()), valuechange=currency_str(3.50)).color()),
-        get_overall_figures('profit', 'Net profit')))
-    tabs.append(html.Tab(html.Label('Relative net profit', html.Value(percentage_str(current_stats['profit'].sum()/current_stats['net_investment_max'].sum())).color()),
-        get_overall_figures('relative_profit', 'Relative net profit')))
+        change = calculate_value_change(
+            total.set_index('date')['return_received'], iscurrency=True)
+        label = html.Label('Return received', html.Value(currency_str(last_row['return_received']),
+            valuechange=change))
+        content = get_overall_figures('return_received', 'Return received')
+        tabs.append(html.Tab(label, content))
+
+    change = calculate_value_change(total.set_index('date')['profit'], iscurrency=True)
+    label = html.Label('Net profit', html.Value(currency_str(last_row['profit']),
+        valuechange=change).color())
+    content = get_overall_figures('profit', 'Net profit')
+    tabs.append(html.Tab(label, content))
+
+    change = calculate_value_change(total.set_index('date')['relative_profit'], ispercentage=True)
+    label = html.Label('Relative net profit', html.Value(
+        percentage_str(last_row['relative_profit']), valuechange=change).color())
+    content = get_overall_figures('relative_profit', 'Relative net profit')
+    tabs.append(html.Tab(label, content))
 
     document.append(html.TabContainer(tabs))
 
@@ -782,7 +800,9 @@ def append_asset_data_tabs(document: html.Document):
         
         # display group total if there is more than one account, or only "mixed" account
         if ((len(group_accounts) > 1) or
-                ((len(group_accounts) == 1) and (group_accounts[0] == ' '))):
+                ((len(group_accounts) == 1) and
+                (group_accounts[0] == ' ') and
+                (group_data['name'].nunique() > 1))):
             group_total = calculate_total_historical_data(group_data, f'{g} Total')
             content += append_asset_data_view(group_total)
         
@@ -840,8 +860,8 @@ if __name__ == '__main__':
                 input = yaml.load( read_file, Loader=yaml.BaseLoader )
             # check that there are no general settings in file
             if not any([s in input for s in settings]):
-                ids = pd.DataFrame(input).drop(columns=['data'])
-                data = pd.DataFrame(input['data']).join(ids)
+                info = pd.DataFrame(input).drop(columns=['data'])
+                data = pd.DataFrame(input['data']).join(info)
                 data = process_data(data)
                 assets = assets.append(data)
 
