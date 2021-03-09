@@ -528,58 +528,80 @@ def plot_historical_asset_data(input: pd.DataFrame) -> go.Figure:
         data['str_net_investment'] = data['net_investment'].apply(currency_str)
         data['str_return_received'] = data['return_received'].apply(currency_str)
         data['str_value'] = data['value'].apply(currency_str)
-        if ((data['price'] != 0) & (pd.notna(data['price']))).any():
-            data['str_value'] += ('<br>Price: ' + data['price'].apply(currency_str)
-                + ' / Amt.: ' + data['amount'].apply(decimal_str))
+        if ((data['amount'] != 0) & (pd.notna(data['amount']))).any():
+            data['str_net_investment'] += ('<br><b>Amount:</b> '
+                + data['amount'].apply(decimal_str))
 
         fig.add_trace(go.Scatter(x=data['date'], y=data['red_fill'], fill='tozeroy',
-            mode='none', fillcolor='rgba(255,0,0,0.7)', hoverinfo='skip'))
+            mode='none', fillcolor='rgba(255,0,0,0.7)', hoverinfo='skip', showlegend=False))
         fig.add_trace(go.Scatter(x=data['date'], y=data['net_investment'], mode='none',
-            customdata=data['str_net_investment'],
-            hovertemplate=f'Net investment: %{{customdata}}<extra></extra>'))
+            customdata=data['str_net_investment'], showlegend=False,
+            hovertemplate=f'<b>Net investment:</b> %{{customdata}}<extra></extra>'))
         data['f_profit'] = data['profit'].apply(currency_str) + ' / '
         data['f_relative_profit'] = data['relative_profit'].apply(percentage_str)
         data['profit_string'] = data['f_profit'] + data['f_relative_profit']
         
         fig.add_trace(go.Scatter(x=data['date'], y=data['value_and_return'], fill='tozeroy',
             mode='none', fillcolor='rgba(0,255,0,0.7)', customdata=data['profit_string'],
-            hovertemplate=f'Net profit: %{{customdata}}<extra></extra>'))
+            hovertemplate=f'<b>Net profit:</b> %{{customdata}}<extra></extra>', showlegend=False))
 
         blue_fill_mode = 'tozeroy'
         if max(data['return_received']) > 0:
             fig.add_trace(go.Scatter(x=data['date'], y=data['return_received'],
                 fill='tozeroy', mode='none', fillcolor='rgba(0,0,0,0)',
-                customdata=data['str_return_received'],
-                hovertemplate=f'Return received: %{{customdata}}<extra></extra>'))
+                customdata=data['str_return_received'], showlegend=False,
+                hovertemplate=f'<b>Return received:</b> %{{customdata}}<extra></extra>'))
             blue_fill_mode = 'tonexty'
 
         blue_fill = data[['date', 'red_fill', 'value_and_return']].copy()
         blue_fill.index *= 2
-        blue_fill['y'] = np.where(blue_fill['red_fill'] < blue_fill['value_and_return'], blue_fill['red_fill'], data['value_and_return'])
+        blue_fill['y'] = np.where(blue_fill['red_fill'] < blue_fill['value_and_return'],
+            blue_fill['red_fill'], data['value_and_return'])
         blue_fill['profitable'] = (blue_fill['y'] == blue_fill['red_fill'])
         mask = blue_fill.iloc[:-1]['profitable'] ^ blue_fill['profitable'].shift(-1)
         intermediate_values = blue_fill[mask].copy()
         intermediate_values.index += 1
         intermediate_values['y'] = np.nan
         blue_fill = blue_fill.append(intermediate_values).sort_index().reset_index(drop=True)
-        blue_fill['slope'] = abs(blue_fill['value_and_return'] - blue_fill['red_fill']) / (abs(blue_fill['value_and_return'] - blue_fill['red_fill']) + abs(blue_fill.shift(-1)['value_and_return'] - blue_fill.shift(-1)['red_fill']))
-        blue_fill['date'] = np.where(pd.isna(blue_fill['y']), (blue_fill.shift(-1)['date'] - blue_fill['date']) * blue_fill['slope'] + blue_fill['date'], blue_fill['date'])
-        blue_fill['y'] = np.where(pd.isna(blue_fill['y']), (blue_fill.shift(-1)['red_fill'] - blue_fill['red_fill']) * blue_fill['slope'] + blue_fill['red_fill'], blue_fill['y'])
-        fig.add_trace(go.Scatter(x=blue_fill['date'], y=blue_fill['y'], fill=blue_fill_mode, mode='none', fillcolor='rgba(0,0,255,0.5)',
-            hoverinfo='skip'))
+        blue_fill['slope'] = (abs(blue_fill['value_and_return'] - blue_fill['red_fill']) /
+            (abs(blue_fill['value_and_return'] - blue_fill['red_fill'])
+            + abs(blue_fill.shift(-1)['value_and_return'] - blue_fill.shift(-1)['red_fill'])))
+        blue_fill['date'] = np.where(pd.isna(blue_fill['y']),
+            ((blue_fill.shift(-1)['date'] - blue_fill['date']) * blue_fill['slope']
+                + blue_fill['date']),
+            blue_fill['date'])
+        blue_fill['y'] = np.where(pd.isna(blue_fill['y']),
+            ((blue_fill.shift(-1)['red_fill'] - blue_fill['red_fill']) * blue_fill['slope']
+                + blue_fill['red_fill']),
+            blue_fill['y'])
+        fig.add_trace(go.Scatter(x=blue_fill['date'], y=blue_fill['y'], fill=blue_fill_mode,
+            mode='none', fillcolor='rgba(0,0,255,0.5)', hoverinfo='skip', showlegend=False))
 
         if max(data['value']) > 0:
             fig.add_trace(go.Scatter(x=data['date'], y=data['value'],
                 mode='lines', line=dict(color='yellow'), customdata=data['str_value'],
-                hovertemplate=f'Value: %{{customdata}}<extra></extra>'))
+                hovertemplate=f'<b>Value:</b> %{{customdata}}<extra></extra>', showlegend=False))
 
-    fig.update_layout(hovermode='x', showlegend=False)
+    fig.update_layout(hovermode='x', showlegend=True, legend=dict(yanchor='bottom', y=1.02, 
+        xanchor='right', x=1.04))
     fig.update_layout(hoverlabel=dict(bgcolor=theme_colors['tab_background_color'],
         font=dict(color=theme_colors['text_color'])))
     configure_historical_dataview(fig, latest_date - input.loc[input.index[0],'date'])
     one_year = [latest_date - datetime.timedelta(days=365), latest_date]
     fig.update_xaxes(range=one_year, rangeslider=dict(visible=True))
     fig.update_yaxes(ticksuffix=currency_tick_suffix(), tickprefix=currency_tick_prefix())
+
+    if ((data['price'] != 0) & (pd.notna(data['price']))).any():
+        data['price_string'] = data['price'].apply(currency_str)
+        fig.add_trace(go.Scatter(x=data['date'], y=data['price'],
+            mode='lines', name='Price', marker=dict(color=cyan), yaxis='y2',
+            customdata=data['price_string'], visible='legendonly',
+            hovertemplate=f'<b>Price:</b> %{{customdata}}<extra></extra>'))
+        fig.update_layout(yaxis2=dict(title='',
+            titlefont=dict(color='cyan'), tickfont=dict(color='cyan'), overlaying='y',
+            ticksuffix=currency_tick_suffix(), tickprefix=currency_tick_prefix(), side='right',
+            range=[min(data['price']) - max(data['price']) * 0.05, max(data['price']) * 1.05]))
+
     return fig
 
 def plot_yearly_asset_data(data: pd.DataFrame) -> go.Figure:
@@ -603,16 +625,21 @@ def plot_yearly_asset_data(data: pd.DataFrame) -> go.Figure:
     yearly_data.drop(yearly_data.head(1).index, inplace=True)  # remove first row
     yearly_data.drop_duplicates(subset=['date'], inplace=True)
 
+    yearly_data['relative_value_change'] = abs(yearly_data['value_change'] /
+        yearly_data['net_investment_max'])
+    yearly_data['relative_return_received'] = (yearly_data['total_return_received'] /
+        yearly_data['net_investment_max'])
+
     yearly_data['value_change_positive'] = np.where(yearly_data['value_change'] > 0,
         yearly_data['value_change'], 0)
     yearly_data['value_change_negative'] = np.where(yearly_data['value_change'] < 0,
         yearly_data['value_change'], 0)
     yearly_data['str_total_return_received'] = yearly_data['total_return_received'].apply(
-        currency_str)
+        currency_str) + ' / ' + yearly_data['relative_return_received'].apply(percentage_str)
     yearly_data['str_value_change_positive'] = '+' + yearly_data['value_change_positive'].apply(
-        currency_str)
+        currency_str) + ' / ' + yearly_data['relative_value_change'].apply(percentage_str)
     yearly_data['str_value_change_negative'] = yearly_data['value_change_negative'].apply(
-        currency_str)
+        currency_str) + ' / ' + yearly_data['relative_value_change'].apply(percentage_str)
 
     bar_width = [0.5] if (len(yearly_data) == 1) else None # single column looks ugly otherwise
 
@@ -621,11 +648,11 @@ def plot_yearly_asset_data(data: pd.DataFrame) -> go.Figure:
         width=bar_width, customdata=np.transpose(yearly_data['str_total_return_received']),
         hovertemplate=(
             f'<b>%{{x}}</b><br>'
-            f'Return received: %{{customdata}}<extra></extra>')))
+            f'Return received:<br>%{{customdata}}<extra></extra>')))
 
     hovertemplate = (
         f'<b>%{{x}}</b><br>'
-        f'Value change: %{{customdata}}<extra></extra>')
+        f'Value change:<br>%{{customdata}}<extra></extra>')
     fig.add_trace(go.Bar(x=yearly_data['date'], y=yearly_data['value_change_positive'],
         marker=dict(color='rgba(0, 255, 0, 0.7)'), width=bar_width, hovertemplate=hovertemplate,
         customdata=np.transpose(yearly_data['str_value_change_positive'])))
@@ -736,7 +763,8 @@ def append_overall_data_tabs(document: html.Document):
 
     tabs = []
     if assets['value'].any() > 0:
-        change = calculate_value_change(total.set_index('date')['value'], iscurrency=True)
+        total['value_change'] = total['profit'] - total['return_received']
+        change = calculate_value_change(total.set_index('date')['value_change'], iscurrency=True)
         label = html.Label('Value', html.Value(currency_str(last_row['value']),
             valuechange=change))
         content = get_overall_figures('value', 'Value')

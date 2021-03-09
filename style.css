@@ -118,7 +118,7 @@ input, section {
     width: 3em;
     height: 3em;
     padding: 0.6em;
-    background-color: var(--hover_tab_indicator_color);
+    background-color: var(--checked_tab_indicator_color);
     border-radius: 50%;
     user-select: none;
     opacity: 0.2;
