@@ -156,6 +156,11 @@ def percentage_tick_suffix() -> str:
         return ' %'
     return '%'
 
+def contains_non_zero_values(column: pd.Series) -> bool:
+    if ((column.values != 0) & (pd.notna(column.values))).any():
+        return True
+    return False
+
 def calculate_value_change(values: pd.Series,
         iscurrency: bool = False, ispercentage: bool = False) -> html.ValueChange:
     if len(values) < 2:  # can't have value changes with 1 or 0 values
@@ -197,7 +202,6 @@ def calculate_value_change(values: pd.Series,
                 monthly_change = decimal_str(change)
 
     return html.ValueChange(daily=daily_change, monthly=monthly_change)
-
 
 def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
     data = input_data.copy()
@@ -297,9 +301,11 @@ def process_data(input_data, discard_zero_values: bool = True) -> pd.DataFrame:
     data['period'] = np.where(nonzero_after_zero_mask, 1, np.nan)
     data['period'] = data['period'].cumsum().interpolate(method='pad')
     data['period'] = data['period'].fillna(0)
-
     if discard_zero_values:
-        data.drop(data[zero_mask].index, inplace=True)
+        # drop zero values of last period
+        last_period_mask = (data['period'] == data['period'].unique()[-1])
+        data.drop(data[zero_mask & last_period_mask].index, inplace=True)
+    data.loc[zero_mask, 'period'] = np.nan
 
     data = data.assign(return_received=0, net_investment=0, net_investment_max=0)
     for p in data['period'].unique():
@@ -426,7 +432,7 @@ def plot_historical_data(dataframe: pd.DataFrame, values: str, label_text: str) 
             f'<b>Total {label_text.lower()}:</b> %{{customdata}}<extra></extra>')))
 
     for a in value_by_date.columns:
-        if any(value_by_date[a] != 0):  # only plot traces with at least one non-zero value
+        if contains_non_zero_values(value_by_date[a]):
             name = asset_properties.loc[a, 'name']
             fig.add_trace(go.Bar(x=value_by_date.index, y=value_by_date[a], name=name,
                 marker=dict(color=asset_properties.loc[a, 'color']),
@@ -460,7 +466,7 @@ def plot_historical_return(dataframe: pd.DataFrame, label_text: str) -> go.Figur
             f'<b>Total return received:</b> %{{customdata}}<extra></extra>')))
 
     for a in value_by_date.columns:
-        if any(value_by_date[a] != 0):  # only plot traces with at least one non-zero value
+        if contains_non_zero_values(value_by_date[a]):
             name = asset_properties.loc[a, 'name']
             fig.add_trace(go.Bar(x=value_by_date.index, y=value_by_date[a], name=name,
                 customdata=np.transpose([str_value_by_date[a], str_value_by_date_cumulative[a]]),
@@ -498,7 +504,7 @@ def plot_historical_relative_profit(dataframe: pd.DataFrame) -> go.Figure:
             f'<b>Total profit:</b> %{{customdata}}<extra></extra>')))
 
     for a in value_by_date.columns:
-        if any(value_by_date[a] != 0):  # only plot traces with at least one non-zero value
+        if contains_non_zero_values(value_by_date[a]):
             name = asset_properties.loc[a, 'name']
             fig.add_trace(go.Bar(x=value_by_date.index, y=value_by_date[a]*100, name=name,
                 marker=dict(color=asset_properties.loc[a,'color']),
@@ -524,22 +530,22 @@ def plot_historical_asset_data(input: pd.DataFrame) -> go.Figure:
     data['str_net_investment'] = data['net_investment'].apply(currency_str)
     data['str_return_received'] = data['return_received'].apply(currency_str)
     data['str_value'] = data['value'].apply(currency_str)
-    if ((data['amount'] != 0) & (pd.notna(data['amount']))).any():
+    if contains_non_zero_values(data['amount']):
         data['str_net_investment'] += ('<br><b>Amount:</b> ' + data['amount'].apply(decimal_str))
 
-    fig.add_trace(go.Scatter(x=data['date'], y=data['net_investment'], mode='none',
-        customdata=data['str_net_investment'], showlegend=False,
-        hovertemplate=f'<b>Net investment:</b> %{{customdata}}<extra></extra>'))
     data['f_profit'] = data['profit'].apply(currency_str) + ' / '
     data['f_relative_profit'] = data['relative_profit'].apply(percentage_str)
     data['profit_string'] = data['f_profit'] + data['f_relative_profit']
 
-    for p in input['period'].unique():
+    for p in input['period'].dropna().unique():
         pdata = data[data['period'] == p].copy()
+
+        fig.add_trace(go.Scatter(x=pdata['date'], y=pdata['net_investment'], mode='none',
+            customdata=pdata['str_net_investment'], showlegend=False,
+            hovertemplate=f'<b>Net investment:</b> %{{customdata}}<extra></extra>'))
 
         pdata['red_fill'] = np.where(pdata['net_investment'] > pdata['return_received'],
             pdata['net_investment'], pdata['return_received'])
-
         fig.add_trace(go.Scatter(x=pdata['date'], y=pdata['red_fill'], fill='tozeroy',
             mode='none', fillcolor='rgba(255,0,0,0.7)', hoverinfo='skip', showlegend=False))
 
@@ -595,23 +601,24 @@ def plot_historical_asset_data(input: pd.DataFrame) -> go.Figure:
     fig.update_yaxes(ticksuffix=currency_tick_suffix(), tickprefix=currency_tick_prefix(),
         range=[0, max_value * 1.05])
 
-    if ((data['price'] != 0) & (pd.notna(data['price']))).any():
+    if contains_non_zero_values(data['price']):
         data['price_string'] = data['price'].apply(currency_str)
         fig.add_trace(go.Scatter(x=data['date'], y=data['price'],
             mode='lines', name='Price', marker=dict(color=cyan), yaxis='y2',
             customdata=data['price_string'], visible='legendonly',
             hovertemplate=f'<b>Price:</b> %{{customdata}}<extra></extra>'))
-        fig.update_layout(yaxis2=dict(title='',
+        fig.update_layout(yaxis2=dict(title='', title_standoff=0,
             titlefont=dict(color='cyan'), tickfont=dict(color='cyan'), overlaying='y',
             ticksuffix=currency_tick_suffix(), tickprefix=currency_tick_prefix(), side='right',
             range=[min(data['price']) - max(data['price']) * 0.05, max(data['price']) * 1.05]))
+        fig.update_layout(margin=dict(r=2))
 
     return fig
 
 def plot_yearly_asset_data(data: pd.DataFrame) -> go.Figure:
     fig = go.Figure()
 
-    # take earliest value of each year, and append latest value
+    # take earliest value of each year, and append overall latest value
     yearly_data = data.groupby(data['date'].dt.year).head(1)
     yearly_data = yearly_data.append(data.iloc[-1])
     
@@ -642,8 +649,13 @@ def plot_yearly_asset_data(data: pd.DataFrame) -> go.Figure:
         currency_str) + ' / ' + yearly_data['relative_return_received'].apply(percentage_str)
     yearly_data['str_value_change_positive'] = '+' + yearly_data['value_change_positive'].apply(
         currency_str) + ' / ' + yearly_data['relative_value_change'].apply(percentage_str)
-    yearly_data['str_value_change_negative'] = yearly_data['value_change_negative'].apply(
-        currency_str) + ' / ' + yearly_data['relative_value_change'].apply(percentage_str)
+
+    if contains_non_zero_values(data['value']):
+        yearly_data['str_value_change_negative'] = yearly_data['value_change_negative'].apply(
+            currency_str) + ' / ' + yearly_data['relative_value_change'].apply(percentage_str)
+    else:
+        yearly_data['str_value_change_negative'] = abs(
+            yearly_data['value_change_negative']).apply(currency_str)
 
     bar_width = [0.5] if (len(yearly_data) == 1) else None # single column looks ugly otherwise
 
@@ -654,9 +666,15 @@ def plot_yearly_asset_data(data: pd.DataFrame) -> go.Figure:
             f'<b>%{{x}}</b><br>'
             f'Return received:<br>%{{customdata}}<extra></extra>')))
 
-    hovertemplate = (
-        f'<b>%{{x}}</b><br>'
-        f'Value change:<br>%{{customdata}}<extra></extra>')
+    if contains_non_zero_values(data['value']):
+        hovertemplate = (
+            f'<b>%{{x}}</b><br>'
+            f'Value change:<br>%{{customdata}}<extra></extra>')
+    else:
+        hovertemplate = (
+            f'<b>%{{x}}</b><br>'
+            f'Funds invested:<br>%{{customdata}}<extra></extra>')
+
     fig.add_trace(go.Bar(x=yearly_data['date'], y=yearly_data['value_change_positive'],
         marker=dict(color='rgba(0, 255, 0, 0.7)'), width=bar_width, hovertemplate=hovertemplate,
         customdata=np.transpose(yearly_data['str_value_change_positive'])))
@@ -724,7 +742,7 @@ def append_asset_data_view(input: pd.DataFrame):
 
     statistics = []
 
-    if data['value'].any() != 0:
+    if contains_non_zero_values(data['value']):
         data['value_change'] = data['profit'] - data['return_received']
         c = calculate_value_change(data.set_index('date')['value_change'], iscurrency=True)
         statistics.append(html.Label('Value',
@@ -922,7 +940,7 @@ if __name__ == '__main__':
 
     current_stats = assets.groupby('id').tail(1)
     for i in current_stats['id']:
-        if assets.loc[i == assets['id'], 'value'].any() != 0:
+        if contains_non_zero_values(assets.loc[i == assets['id'], 'value']):
             if current_stats.loc[i == current_stats['id'], 'value'].any() == 0:
                 # drop assets, which had non-zero value, but were sold
                 current_stats = current_stats[i != current_stats['id']]
