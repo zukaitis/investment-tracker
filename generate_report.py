@@ -518,45 +518,47 @@ def plot_historical_relative_profit(dataframe: pd.DataFrame) -> go.Figure:
 def plot_historical_asset_data(input: pd.DataFrame) -> go.Figure:
     fig = go.Figure()
 
+    data = input.copy()
+    data['value_and_return'] = data['net_investment'] + data['profit']
+
+    data['str_net_investment'] = data['net_investment'].apply(currency_str)
+    data['str_return_received'] = data['return_received'].apply(currency_str)
+    data['str_value'] = data['value'].apply(currency_str)
+    if ((data['amount'] != 0) & (pd.notna(data['amount']))).any():
+        data['str_net_investment'] += ('<br><b>Amount:</b> ' + data['amount'].apply(decimal_str))
+
+    fig.add_trace(go.Scatter(x=data['date'], y=data['net_investment'], mode='none',
+        customdata=data['str_net_investment'], showlegend=False,
+        hovertemplate=f'<b>Net investment:</b> %{{customdata}}<extra></extra>'))
+    data['f_profit'] = data['profit'].apply(currency_str) + ' / '
+    data['f_relative_profit'] = data['relative_profit'].apply(percentage_str)
+    data['profit_string'] = data['f_profit'] + data['f_relative_profit']
+
     for p in input['period'].unique():
-        data = input[input['period'] == p].copy()
-        data['value_and_return'] = data['net_investment'] + data['profit']
-        data['red_fill'] = np.where(
-            data['net_investment'] > data['return_received'],
-            data['net_investment'], data['return_received'])
+        pdata = data[data['period'] == p].copy()
 
-        data['str_net_investment'] = data['net_investment'].apply(currency_str)
-        data['str_return_received'] = data['return_received'].apply(currency_str)
-        data['str_value'] = data['value'].apply(currency_str)
-        if ((data['amount'] != 0) & (pd.notna(data['amount']))).any():
-            data['str_net_investment'] += ('<br><b>Amount:</b> '
-                + data['amount'].apply(decimal_str))
+        pdata['red_fill'] = np.where(pdata['net_investment'] > pdata['return_received'],
+            pdata['net_investment'], pdata['return_received'])
 
-        fig.add_trace(go.Scatter(x=data['date'], y=data['red_fill'], fill='tozeroy',
+        fig.add_trace(go.Scatter(x=pdata['date'], y=pdata['red_fill'], fill='tozeroy',
             mode='none', fillcolor='rgba(255,0,0,0.7)', hoverinfo='skip', showlegend=False))
-        fig.add_trace(go.Scatter(x=data['date'], y=data['net_investment'], mode='none',
-            customdata=data['str_net_investment'], showlegend=False,
-            hovertemplate=f'<b>Net investment:</b> %{{customdata}}<extra></extra>'))
-        data['f_profit'] = data['profit'].apply(currency_str) + ' / '
-        data['f_relative_profit'] = data['relative_profit'].apply(percentage_str)
-        data['profit_string'] = data['f_profit'] + data['f_relative_profit']
-        
-        fig.add_trace(go.Scatter(x=data['date'], y=data['value_and_return'], fill='tozeroy',
-            mode='none', fillcolor='rgba(0,255,0,0.7)', customdata=data['profit_string'],
+
+        fig.add_trace(go.Scatter(x=pdata['date'], y=pdata['value_and_return'], fill='tozeroy',
+            mode='none', fillcolor='rgba(0,255,0,0.7)', customdata=pdata['profit_string'],
             hovertemplate=f'<b>Net profit:</b> %{{customdata}}<extra></extra>', showlegend=False))
 
         blue_fill_mode = 'tozeroy'
-        if max(data['return_received']) > 0:
-            fig.add_trace(go.Scatter(x=data['date'], y=data['return_received'],
+        if max(pdata['return_received']) > 0:
+            fig.add_trace(go.Scatter(x=pdata['date'], y=pdata['return_received'],
                 fill='tozeroy', mode='none', fillcolor='rgba(0,0,0,0)',
-                customdata=data['str_return_received'], showlegend=False,
+                customdata=pdata['str_return_received'], showlegend=False,
                 hovertemplate=f'<b>Return received:</b> %{{customdata}}<extra></extra>'))
             blue_fill_mode = 'tonexty'
 
-        blue_fill = data[['date', 'red_fill', 'value_and_return']].copy()
+        blue_fill = pdata[['date', 'red_fill', 'value_and_return']].copy()
         blue_fill.index *= 2
         blue_fill['y'] = np.where(blue_fill['red_fill'] < blue_fill['value_and_return'],
-            blue_fill['red_fill'], data['value_and_return'])
+            blue_fill['red_fill'], pdata['value_and_return'])
         blue_fill['profitable'] = (blue_fill['y'] == blue_fill['red_fill'])
         mask = blue_fill.iloc[:-1]['profitable'] ^ blue_fill['profitable'].shift(-1)
         intermediate_values = blue_fill[mask].copy()
@@ -577,9 +579,9 @@ def plot_historical_asset_data(input: pd.DataFrame) -> go.Figure:
         fig.add_trace(go.Scatter(x=blue_fill['date'], y=blue_fill['y'], fill=blue_fill_mode,
             mode='none', fillcolor='rgba(0,0,255,0.5)', hoverinfo='skip', showlegend=False))
 
-        if max(data['value']) > 0:
-            fig.add_trace(go.Scatter(x=data['date'], y=data['value'],
-                mode='lines', line=dict(color='yellow'), customdata=data['str_value'],
+        if max(pdata['value']) > 0:
+            fig.add_trace(go.Scatter(x=pdata['date'], y=pdata['value'],
+                mode='lines', line=dict(color='yellow'), customdata=pdata['str_value'],
                 hovertemplate=f'<b>Value:</b> %{{customdata}}<extra></extra>', showlegend=False))
 
     fig.update_layout(hovermode='x', showlegend=True, legend=dict(yanchor='bottom', y=1.02, 
@@ -589,7 +591,9 @@ def plot_historical_asset_data(input: pd.DataFrame) -> go.Figure:
     configure_historical_dataview(fig, latest_date - input.loc[input.index[0],'date'])
     one_year = [latest_date - datetime.timedelta(days=365), latest_date]
     fig.update_xaxes(range=one_year, rangeslider=dict(visible=True))
-    fig.update_yaxes(ticksuffix=currency_tick_suffix(), tickprefix=currency_tick_prefix())
+    max_value = max(max(data['net_investment']), max(data['value_and_return']))
+    fig.update_yaxes(ticksuffix=currency_tick_suffix(), tickprefix=currency_tick_prefix(),
+        range=[0, max_value * 1.05])
 
     if ((data['price'] != 0) & (pd.notna(data['price']))).any():
         data['price_string'] = data['price'].apply(currency_str)
