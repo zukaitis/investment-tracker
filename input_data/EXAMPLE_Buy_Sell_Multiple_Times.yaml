@@ -1,7 +1,7 @@
 ---
-name: Buy-Sell Multiple Times, Inc
+name: Buy-Sell Multiple Times
 symbol: TSLA
-account: Shady Offshore Bank
+account: Some Other Bank
 group: Stocks
 data:
   - { date: 2017-07-19, investment: +350, amount: 7 }

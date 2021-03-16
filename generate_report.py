@@ -174,12 +174,14 @@ def calculate_value_change(values: pd.Series,
     # check how recent the data is
     if ((data.index[-1] - data.index[-2]) <= delta) and ((latest_date - data.index[-1]) <= delta):
         change = data.values[-1] - data.values[-2]
-        if change != 0:
-            if iscurrency:
+        if iscurrency:
+            if abs(change) >= 0.01:
                 daily_change = currency_str(change)
-            elif ispercentage:
+        elif ispercentage:
+            if abs(change) >= 0.0001:  # 0.01%
                 daily_change = percentage_str(change)
-            else:
+        else:
+            if change != 0:
                 daily_change = decimal_str(change)
 
     data = data.to_frame()
@@ -193,12 +195,14 @@ def calculate_value_change(values: pd.Series,
     if (((monthly.loc[monthly.index[-1], 'm'] - monthly.loc[monthly.index[-2], 'm']) == 1) and
             (latest_m - monthly.loc[monthly.index[-1], 'm'] <= 1)):
         change = monthly.loc[monthly.index[-1], 'value'] - monthly.loc[monthly.index[-2], 'value']
-        if change != 0:
-            if iscurrency:
+        if iscurrency:
+            if abs(change) >= 0.01:
                 monthly_change = currency_str(change)
-            elif ispercentage:
+        elif ispercentage:
+            if abs(change) >= 0.0001:  # 0.01%
                 monthly_change = percentage_str(change)
-            else:
+        else:
+            if change != 0:
                 monthly_change = decimal_str(change)
 
     return html.ValueChange(daily=daily_change, monthly=monthly_change)
@@ -297,15 +301,16 @@ def process_data(input_data, discard_zero_values: bool = True) -> pd.DataFrame:
         data['return'] = 0.0
 
     nonzero_after_zero_mask = ((data['value'] != 0) & (data['value'].shift(1) == 0))
-    zero_mask = (data['value'] == 0) & (data['investment'] == 0)
+    zero_mask = (data['value'] == 0) & (data['investment'] == 0) & (data['return'] == 0)
     data['period'] = np.where(nonzero_after_zero_mask, 1, np.nan)
     data['period'] = data['period'].cumsum().interpolate(method='pad')
-    data['period'] = data['period'].fillna(0)
+    data['period'] = data['period'].fillna(0) + 1
     if discard_zero_values:
         # drop zero values of last period
-        last_period_mask = (data['period'] == data['period'].unique()[-1])
+        last_period_mask = (data['period'] == max(data['period']))
         data.drop(data[zero_mask & last_period_mask].index, inplace=True)
-    data.loc[zero_mask, 'period'] = np.nan
+    data.loc[zero_mask, 'period'] = 0  # period 0 marks price-only periods
+    data['sold'] = ((data['value'] == 0) & (data['value'].shift(1) != 0))
 
     data = data.assign(return_received=0, net_investment=0, net_investment_max=0)
     for p in data['period'].unique():
@@ -328,8 +333,8 @@ def calculate_monthly_values(input: pd.DataFrame) -> pd.DataFrame:
     group_by_month = daily.groupby(['id', 'year', 'month'])
 
     monthly = group_by_month.agg({'date': 'last', 'value': 'last', 'net_investment': 'last',
-        'net_investment_max': 'last', 'return': 'sum', 'profit':'last',
-        'relative_profit': 'last'}).reset_index()
+        'net_investment_max': 'last', 'return': 'sum', 'profit': 'last',
+        'relative_profit': 'last', 'period': 'last', 'sold': 'last'}).reset_index()
     
     monthly['date'] = monthly['date'].map(lambda x: x.replace(day=1))
     monthly.drop(columns=['year', 'month'], inplace=True)
@@ -417,13 +422,19 @@ def plot_sunburst(input: pd.DataFrame, values: str, label_text: str):
 
 def plot_historical_data(dataframe: pd.DataFrame, values: str, label_text: str) -> go.Figure:
     value_by_date = dataframe.pivot(index='date', columns='id', values=values)
-    if values != 'profit':
-        value_by_date.interpolate(method='pad', inplace=True)
+    value_by_date.interpolate(method='pad', inplace=True)
+    period = dataframe.pivot(index='date', columns='id', values='period')
+    sold = dataframe.pivot(index='date', columns='id', values='sold').shift(-1)
+    for c in period.columns:
+        period[c] = np.where((sold[c] == True) & np.isnan(period[c]), 0, period[c])
+    print(period)
+    period.interpolate(method='pad', inplace=True)
+    value_by_date *= period.applymap(lambda p: 1 if p > 0 else 0)
     str_value_by_date = value_by_date.applymap(currency_str)
 
     fig = go.Figure()
 
-    value_by_date_sum = value_by_date.sum(axis = 1, skipna = True)
+    value_by_date_sum = value_by_date.sum(axis=1, skipna=True)
     str_value_by_date_sum = value_by_date_sum.apply(currency_str)
     fig.add_trace(go.Scatter(x=value_by_date_sum.index, y=value_by_date_sum.values,
         mode='lines+markers', name='Total', marker=dict(color=cyan),
@@ -538,6 +549,8 @@ def plot_historical_asset_data(input: pd.DataFrame) -> go.Figure:
     data['profit_string'] = data['f_profit'] + data['f_relative_profit']
 
     for p in input['period'].dropna().unique():
+        if p == 0:
+            continue
         pdata = data[data['period'] == p].copy()
 
         fig.add_trace(go.Scatter(x=pdata['date'], y=pdata['net_investment'], mode='none',
@@ -607,10 +620,11 @@ def plot_historical_asset_data(input: pd.DataFrame) -> go.Figure:
             mode='lines', name='Price', marker=dict(color=cyan), yaxis='y2',
             customdata=data['price_string'], visible='legendonly',
             hovertemplate=f'<b>Price:</b> %{{customdata}}<extra></extra>'))
+        margin = (max(data['price']) - min(data['price'])) * 0.05
         fig.update_layout(yaxis2=dict(title='', title_standoff=0,
             titlefont=dict(color='cyan'), tickfont=dict(color='cyan'), overlaying='y',
             ticksuffix=currency_tick_suffix(), tickprefix=currency_tick_prefix(), side='right',
-            range=[min(data['price']) - max(data['price']) * 0.05, max(data['price']) * 1.05]))
+            range=[min(data['price']) - margin, max(data['price']) + margin]))
         fig.update_layout(margin=dict(r=2))
 
     return fig
@@ -618,8 +632,9 @@ def plot_historical_asset_data(input: pd.DataFrame) -> go.Figure:
 def plot_yearly_asset_data(data: pd.DataFrame) -> go.Figure:
     fig = go.Figure()
 
+    # filter price-only data, where period is 0
     # take earliest value of each year, and append overall latest value
-    yearly_data = data.groupby(data['date'].dt.year).head(1)
+    yearly_data = data[data['period'] != 0].groupby(data['date'].dt.year).head(1)
     yearly_data = yearly_data.append(data.iloc[-1])
     
     yearly_data['value_change'] = yearly_data['profit'] - yearly_data['return_received']
