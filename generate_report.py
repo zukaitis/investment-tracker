@@ -327,7 +327,7 @@ def process_data(input_data, discard_zero_values: bool = True) -> pd.DataFrame:
     return data
 
 def calculate_monthly_values(input: pd.DataFrame) -> pd.DataFrame:
-    daily = input.copy()
+    daily = input[input['period'] != 0].copy()  # only take values, containing full data
     daily['year'] = daily['date'].dt.year
     daily['month'] = daily['date'].dt.month
     group_by_month = daily.groupby(['id', 'year', 'month'])
@@ -421,21 +421,26 @@ def plot_sunburst(input: pd.DataFrame, values: str, label_text: str):
             f'<b>%{{label}}</b><br>{label_text}: %{{customdata}}<extra></extra>')
 
 def plot_historical_data(dataframe: pd.DataFrame, values: str, label_text: str) -> go.Figure:
+    # reshape array into a desired form, and fill missing values by using previous values
     value_by_date = dataframe.pivot(index='date', columns='id', values=values)
     value_by_date.interpolate(method='pad', inplace=True)
+
+    # create a period array in the same form as value_by_date array, and set period to 0,
+    #   after asset is sold, then fill missing values in the same fashion as value_by_date array
     period = dataframe.pivot(index='date', columns='id', values='period')
-    sold = dataframe.pivot(index='date', columns='id', values='sold').shift(-1)
+    sold = dataframe.pivot(index='date', columns='id', values='sold').shift(1)
     for c in period.columns:
         period[c] = np.where((sold[c] == True) & np.isnan(period[c]), 0, period[c])
-    print(period)
     period.interpolate(method='pad', inplace=True)
+
+    # set value to 0, whereever period is 0
     value_by_date *= period.applymap(lambda p: 1 if p > 0 else 0)
+
     str_value_by_date = value_by_date.applymap(currency_str)
-
-    fig = go.Figure()
-
     value_by_date_sum = value_by_date.sum(axis=1, skipna=True)
     str_value_by_date_sum = value_by_date_sum.apply(currency_str)
+
+    fig = go.Figure()
     fig.add_trace(go.Scatter(x=value_by_date_sum.index, y=value_by_date_sum.values,
         mode='lines+markers', name='Total', marker=dict(color=cyan),
         customdata=np.transpose(str_value_by_date_sum.values), hovertemplate=(
@@ -507,7 +512,7 @@ def plot_historical_relative_profit(dataframe: pd.DataFrame) -> go.Figure:
     fig = go.Figure()
 
     overall = dataframe.groupby('date').sum()[['profit', 'net_investment_max']]
-    overall['values'] = (overall['profit'] / overall['net_investment_max'])
+    overall['values'] = overall['profit'] / overall['net_investment_max']
     overall['strings'] = overall['values'].apply(percentage_str)
     fig.add_trace(go.Scatter(x=overall.index, y=overall['values']*100, mode='lines+markers',
         name='Total', marker=dict(color=cyan), customdata=overall['strings'], hovertemplate=(
@@ -728,9 +733,6 @@ def configure_historical_dataview(figure: go.Figure, timerange: datetime.timedel
     figure.update_layout(xaxis=dict(title=dict(text='')), yaxis=dict(title=dict(text='')))
 
 def get_overall_figures(statistic: str, label_text: str) -> html.Columns:
-    sunburst = go.Figure(plot_sunburst(current_stats, statistic, label_text))
-    sunburst.update_traces(insidetextorientation='radial')
-    sunburst.update_layout(margin=dict(l=10, r=10, t=10, b=10))
 
     if statistic == 'relative_profit':
         historical = plot_historical_relative_profit(monthly_data)
@@ -738,6 +740,14 @@ def get_overall_figures(statistic: str, label_text: str) -> html.Columns:
         historical = plot_historical_return(monthly_data, label_text)
     else:
         historical = plot_historical_data(monthly_data, statistic, label_text)
+
+    if all(current_stats[statistic] == 0):
+        return html.Columns([html.Column(content=historical.to_html(
+            full_html=False, include_plotlyjs=True))])
+
+    sunburst = go.Figure(plot_sunburst(current_stats, statistic, label_text))
+    sunburst.update_traces(insidetextorientation='radial')
+    sunburst.update_layout(margin=dict(l=10, r=10, t=10, b=10))
 
     return html.Columns([html.Column(width=30, content=sunburst.to_html(
             full_html=False, include_plotlyjs=True)),
@@ -816,8 +826,10 @@ def append_overall_data_tabs(document: html.Document):
     if assets['return_received'].any() > 0:
         change = calculate_value_change(
             total.set_index('date')['return_received'], iscurrency=True)
-        label = html.Label('Return received', html.Value(currency_str(last_row['return_received']),
-            valuechange=change))
+        value = None
+        if last_row['return_received'] != 0:
+            value = html.Value(currency_str(last_row['return_received']), valuechange=change)
+        label = html.Label('Return received', value)
         content = get_overall_figures('return_received', 'Return received')
         tabs.append(html.Tab(label, content))
 
@@ -925,10 +937,15 @@ if __name__ == '__main__':
                 input = yaml.load( read_file, Loader=yaml.BaseLoader )
             # check that there are no general settings in file
             if not any([s in input for s in settings]):
-                info = pd.DataFrame(input).drop(columns=['data'])
-                data = pd.DataFrame(input['data']).join(info)
-                data = process_data(data)
-                assets = assets.append(data)
+                try:
+                    info = pd.DataFrame(input)
+                except ValueError:
+                    info = pd.DataFrame()  # create empty dataframe in case of an error in input
+                if 'data' in info.columns: # protection against files with no data
+                    info.drop(columns=['data'], inplace=True)
+                    data = pd.DataFrame(input['data']).join(info)
+                    data = process_data(data)
+                    assets = assets.append(data)
 
     assets['account'] = assets['account'].fillna(' ')  # empty string doesn't work
     assets['id'] = assets['group'] + assets['account'] + assets['name']  # + assets['symbol']
@@ -956,8 +973,16 @@ if __name__ == '__main__':
     current_stats = assets.groupby('id').tail(1)
     for i in current_stats['id']:
         if contains_non_zero_values(assets.loc[i == assets['id'], 'value']):
-            if current_stats.loc[i == current_stats['id'], 'value'].any() == 0:
-                # drop assets, which had non-zero value, but were sold
+            # drop assets, which had non-zero value, but were sold
+            # all() is needed, because it is assumed there might be more than one matching value
+            if all(current_stats.loc[i == current_stats['id'], 'value'] == 0):
+                current_stats = current_stats[i != current_stats['id']]
+        else:
+            # don't display taxes among current stats,
+            #   if they weren't updated for a certain amount of time
+            if current_stats.loc[i == current_stats['id'],
+                    'date'].iloc[0] < (latest_date - pd.DateOffset(months=6)):
+                # TODO: setting for limitation period would be nice
                 current_stats = current_stats[i != current_stats['id']]
 
     monthly_data = calculate_monthly_values(assets)
