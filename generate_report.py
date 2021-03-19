@@ -289,10 +289,9 @@ def process_data(input_data, discard_zero_values: bool = True) -> pd.DataFrame:
                 data['value'] = data['amount'] * data['price']
 
         if 'value' in data.columns:
-            data['value'] = data['value'].interpolate(method='linear')
+            data['value'] = data['value'].interpolate(method='linear').fillna(0.0)
         else:
             data['value'] = 0.0
-        data['value'] = data['value'].fillna(0.0)
 
     if 'return' in data.columns:
         data['return'] = pd.to_numeric(data['return'])
@@ -311,6 +310,15 @@ def process_data(input_data, discard_zero_values: bool = True) -> pd.DataFrame:
         data.drop(data[zero_mask & last_period_mask].index, inplace=True)
     data.loc[zero_mask, 'period'] = 0  # period 0 marks price-only periods
     data['sold'] = ((data['value'] == 0) & (data['value'].shift(1) != 0))
+
+    if (data['value'] == 0).all():
+        # if time till next date is too long, add 'sold' mark for montly calculations
+        data['relevance_period'] = data['date'] + pd.DateOffset(months=2)  # TODO: add setting
+        data.loc[data['relevance_period'] < data['date'].shift(-1), 'sold'] = True
+        data.drop(columns=['relevance_period'], inplace=True)
+        # add sold mark to the last row, if it is older than specified period
+        if (data.loc[data.index[-1], 'date'] + pd.DateOffset(months=2)) < datetime.date.today():
+            data.loc[data.index[-1], 'sold'] = True
 
     data = data.assign(return_received=0, net_investment=0, net_investment_max=0)
     for p in data['period'].unique():
