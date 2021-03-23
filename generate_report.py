@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 
 import _html as html
+from _settings import Settings
+from _common import print_warning
 
 import os
 import yaml
@@ -14,7 +16,6 @@ import plotly.io
 import yfinance as yf
 from dataclasses import dataclass
 import dataclasses
-import warnings
 import babel.numbers
 import babel.dates
 
@@ -35,65 +36,6 @@ colors_dark = dict(
     tab_shadow_color='#202020',
     checked_tab_indicator_color='#00ccee',
     hover_tab_indicator_color='#11363c')
-
-def print_warning(message: str):
-    warnings.warn(f'WARNING: {message}')
-
-class Settings:
-    owner = 'Your'
-    currency = 'EUR'
-    locale = 'en_US_POSIX'
-    autofill_interval = '1d'
-    autofill_price_mark = 'Close'
-    theme = 'auto'
-    value_change_span_days = 3
-
-    def __setattr__(self, name, value):
-        if name == 'owner':
-            self.__dict__[name] = f"{value}'s"
-        elif name == 'currency':
-            try:
-                yf.Ticker(f'{value}=X').info
-            except ValueError:
-                print_warning(f'Unknown currency - "{value}"')
-            else:
-                self.__dict__[name] = value
-        elif name == 'locale':
-            if babel.localedata.exists(value):
-                self.__dict__[name] = value
-            else:
-                print_warning(f'Unknown locale - "{value}"')
-        elif name == 'autofill_interval':
-            allowed = ['1d', '5d', '1wk', '1mo', '3mo']
-            if value in allowed:
-                self.__dict__[name] = value
-            else:
-                print_warning(f'Unknown interval - "{value}". Allowed intervals: {allowed}')
-        elif name == 'autofill_price_mark':
-            allowed = ['Open', 'Close', 'High', 'Low']
-            if value in allowed:
-                self.__dict__[name] = value
-            else:
-                print_warning(f'Unknown price mark - "{value}". Allowed marks: {allowed}')
-        elif name == 'theme':
-            allowed = ['light', 'dark', 'auto']
-            if value in allowed:
-                self.__dict__[name] = value
-            else:
-                print_warning(f'Unknown theme - "{value}". Allowed themes: {allowed}')
-        elif name == 'value_change_span_days':
-            if (type(value) is int) and (value > 0):
-                self.__dict__[name] = value
-            else:
-                print_warning(f'Value change span has to be a positive number')
-        elif name not in self:
-            print_warning(f'No such setting - "{name}"')
-        else:
-            self.__dict__[name] = value
-
-    def __iter__(self):
-        variables = [d for d in dir(self) if not d.startswith('_')]
-        return iter(variables)
 
 def currency_str(value: float) -> str:
     if np.isnan(value) or np.isinf(value):
@@ -313,11 +255,13 @@ def process_data(input_data, discard_zero_values: bool = True) -> pd.DataFrame:
 
     if (data['value'] == 0).all():
         # if time till next date is too long, add 'sold' mark for montly calculations
-        data['relevance_period'] = data['date'] + pd.DateOffset(months=2)  # TODO: add setting
+        data['relevance_period'] = data['date'] + pd.DateOffset(
+            months=settings.no_value_relevance_period_months)
         data.loc[data['relevance_period'] < data['date'].shift(-1), 'sold'] = True
         data.drop(columns=['relevance_period'], inplace=True)
-        # add sold mark to the last row, if it is older than specified period
-        if (data.loc[data.index[-1], 'date'] + pd.DateOffset(months=2)) < datetime.date.today():
+        # add sold mark to the last row, if the row is older than specified period
+        if (data.loc[data.index[-1], 'date'] + pd.DateOffset(
+                months=settings.no_value_relevance_period_months)) < datetime.date.today():
             data.loc[data.index[-1], 'sold'] = True
 
     data = data.assign(return_received=0, net_investment=0, net_investment_max=0)
@@ -988,9 +932,8 @@ if __name__ == '__main__':
         else:
             # don't display taxes among current stats,
             #   if they weren't updated for a certain amount of time
-            if current_stats.loc[i == current_stats['id'],
-                    'date'].iloc[0] < (latest_date - pd.DateOffset(months=6)):
-                # TODO: setting for limitation period would be nice
+            if current_stats.loc[i == current_stats['id'], 'date'].iloc[0] < (latest_date -
+                    pd.DateOffset(months=settings.no_value_relevance_period_months)):
                 current_stats = current_stats[i != current_stats['id']]
 
     monthly_data = calculate_monthly_values(assets)
