@@ -2,6 +2,7 @@ from _common import print_warning
 
 import babel
 import yfinance as yf
+import pandas as pd
 
 class Settings:
     owner = 'Your'
@@ -10,8 +11,9 @@ class Settings:
     autofill_interval = '1d'
     autofill_price_mark = 'Close'
     theme = 'auto'
-    value_change_span_days = 3
-    no_value_relevance_period_months = 6
+    value_change_span = '3d'
+    relevance_period = '6M'
+    timezone = 'UTC'
 
     def __setattr__(self, name, value):
         if name == 'owner':
@@ -46,16 +48,20 @@ class Settings:
                 self.__dict__[name] = value
             else:
                 print_warning(f'Unknown theme - "{value}". Allowed themes: {allowed}')
-        elif name == 'value_change_span_days':
-            if (type(value) is int) and (value > 0):
-                self.__dict__[name] = value
+        elif name == 'value_change_span':
+            try:
+                pd.tseries.frequencies.to_offset(value)
+            except ValueError:
+                print_warning(f'Unrecognized value change span - {value}')
             else:
-                print_warning(f'Value change span has to be a positive number')
-        elif name == 'no_value_relevance_period_months':
-            if (type(value) is int) and (value > 0):
                 self.__dict__[name] = value
+        elif name == 'relevance_period':
+            try:
+                pd.tseries.frequencies.to_offset(value)
+            except ValueError:
+                print_warning(f'Unrecognized relevance period - {value}')
             else:
-                print_warning(f'Relevance period has to be a positive number')
+                self.__dict__[name] = value
         elif name not in self:
             print_warning(f'No such setting - "{name}"')
         else:

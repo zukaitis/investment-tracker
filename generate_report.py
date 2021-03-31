@@ -113,13 +113,13 @@ def calculate_value_change(values: pd.Series,
     monthly_change = None
     data = values.copy().sort_index()
 
-    delta = datetime.timedelta(days=settings.value_change_span_days)
+    delta = pd.tseries.frequencies.to_offset(settings.value_change_span)
     # check how recent the data is
     if ((data.index[-1] - data.index[-2]) <= delta) and ((latest_date - data.index[-1]) <= delta):
         change = data.values[-1] - data.values[-2]
         if iscurrency:
             if abs(change) >= 0.01:
-                daily_change = currency_str(change)
+                daily_change = currency_str(round(change, 2))
         elif ispercentage:
             if abs(change) >= 0.0001:  # 0.01%
                 daily_change = percentage_str(change)
@@ -157,8 +157,13 @@ def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
     ticker = yf.Ticker(symbol)
     print(f'Fetching yfinance data for {symbol}')
     # download extra data, just to be sure, that the requred date will appear on yf dataframe
-    start_date = input_data.loc[input_data.index[0], 'date'] - datetime.timedelta(days=7)  
-    yfdata = ticker.history(start=start_date, interval=settings.autofill_interval)
+    start_date = input_data.loc[input_data.index[0], 'date'] - datetime.timedelta(days=7)
+    fine = ticker.history(period='5d', interval='60m')
+    fine.index = fine.index.tz_convert(settings.timezone).tz_localize(None)
+    coarse_end_date = fine.index[0].date()
+    coarse = ticker.history(start=start_date, end=coarse_end_date, interval='1d')
+    yfdata = pd.merge(coarse, fine, how='outer', on=coarse.columns.to_list(),  # merge all columns
+        left_index=True, right_index=True)
     if ticker.info['currency'] != settings.currency:
         # convert currency, if it differs from the one selected in settings
         currency_ticker = yf.Ticker(f"{ticker.info['currency']}{settings.currency}=X")
@@ -167,7 +172,7 @@ def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
         yfdata[settings.autofill_price_mark] *= currency_rate[settings.autofill_price_mark]
         yfdata['Dividends'] *= currency_rate[settings.autofill_price_mark]
 
-    yfdata = yfdata.reset_index().rename(columns={'Date':'date',
+    yfdata = yfdata.reset_index().rename(columns={'index':'date',
         settings.autofill_price_mark:'price'})
 
     data = pd.merge(data, yfdata, on='date', how='outer').sort_values(by=['date'])
@@ -256,13 +261,13 @@ def process_data(input_data, discard_zero_values: bool = True) -> pd.DataFrame:
 
     if (data['value'] == 0).all():
         # if time till next date is too long, add 'sold' mark for montly calculations
-        data['relevance_period'] = data['date'] + pd.DateOffset(
-            months=settings.no_value_relevance_period_months)
+        data['relevance_period'] = data['date'] + pd.tseries.frequencies.to_offset(
+            settings.relevance_period)
         data.loc[data['relevance_period'] < data['date'].shift(-1), 'sold'] = True
         data.drop(columns=['relevance_period'], inplace=True)
         # add sold mark to the last row, if the row is older than specified period
-        if (data.loc[data.index[-1], 'date'] + pd.DateOffset(
-                months=settings.no_value_relevance_period_months)) < datetime.date.today():
+        if (data.loc[data.index[-1], 'date'] + pd.tseries.frequencies.to_offset(
+            settings.relevance_period)) < datetime.date.today():
             data.loc[data.index[-1], 'sold'] = True
 
     data = data.assign(return_received=0, net_investment=0, net_investment_max=0)
@@ -934,7 +939,7 @@ if __name__ == '__main__':
             # don't display taxes among current stats,
             #   if they weren't updated for a certain amount of time
             if current_stats.loc[i == current_stats['id'], 'date'].iloc[0] < (latest_date -
-                    pd.DateOffset(months=settings.no_value_relevance_period_months)):
+                    pd.tseries.frequencies.to_offset(settings.relevance_period)):
                 current_stats = current_stats[i != current_stats['id']]
 
     monthly_data = calculate_monthly_values(assets)
