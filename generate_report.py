@@ -100,7 +100,7 @@ def percentage_tick_suffix() -> str:
     return '%'
 
 def contains_non_zero_values(column: pd.Series) -> bool:
-    if ((column.values != 0) & (pd.notna(column.values))).any():
+    if any((column.values != 0) & (pd.notna(column.values))):
         return True
     return False
 
@@ -149,6 +149,18 @@ def calculate_value_change(values: pd.Series,
                 monthly_change = decimal_str(change)
 
     return html.ValueChange(daily=daily_change, monthly=monthly_change)
+
+def calculate_frequency(dates: pd.Series) -> str:
+    frequency = None
+    if len(dates) >= 4:  # calculate frequency from three dates before the last
+        frequency = pd.infer_freq(dates.iloc[-4:-1])
+    if (frequency == None) and (len(dates) >= 2):
+        period = dates.iloc[-1] - dates.iloc[-2]
+        if period < pd.tseries.frequencies.to_offset('2H'):
+            frequency = 'H'  # hourly
+        elif period < pd.tseries.frequencies.to_offset('2D'):
+            frequency = 'D'  # daily
+    return frequency
 
 def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
     data = input_data.copy()
@@ -294,7 +306,7 @@ def calculate_monthly_values(input: pd.DataFrame) -> pd.DataFrame:
         'net_investment_max': 'last', 'return': 'sum', 'profit': 'last',
         'relative_profit': 'last', 'period': 'last', 'sold': 'last'}).reset_index()
     
-    monthly['date'] = monthly['date'].map(lambda x: x.replace(day=1))
+    monthly['date'] = monthly['date'].map(lambda x: x.replace(day=1, hour=0, minute=0, second=0))
     monthly.drop(columns=['year', 'month'], inplace=True)
 
     return monthly
@@ -570,9 +582,15 @@ def plot_historical_asset_data(input: pd.DataFrame) -> go.Figure:
         xanchor='right', x=1.04))
     fig.update_layout(hoverlabel=dict(bgcolor=theme_colors['tab_background_color'],
         font=dict(color=theme_colors['text_color'])))
-    configure_historical_dataview(fig, latest_date - input.loc[input.index[0],'date'])
-    one_year = [latest_date - datetime.timedelta(days=365), latest_date]
-    fig.update_xaxes(range=one_year, rangeslider=dict(visible=True))
+    frequency = calculate_frequency(data['date'])
+    configure_historical_dataview(fig, latest_date - input.loc[input.index[0],'date'], frequency)
+    span = '1Y'
+    if frequency in ['H', 'BH']:  # hourly data
+        span = '5D'
+    elif frequency in ['B', 'C', 'D']:  # daily data
+        span = '1M'
+    range = [latest_date - pd.tseries.frequencies.to_offset(span), latest_date]
+    fig.update_xaxes(range=range, rangeslider=dict(visible=True))
     max_value = max(max(data['net_investment']), max(data['value_and_return']))
     fig.update_yaxes(ticksuffix=currency_tick_suffix(), tickprefix=currency_tick_prefix(),
         range=[0, max_value * 1.05])
@@ -668,20 +686,31 @@ def plot_yearly_asset_data(data: pd.DataFrame) -> go.Figure:
 
     return fig
 
-def configure_historical_dataview(figure: go.Figure, timerange: datetime.timedelta):
+def configure_historical_dataview(figure: go.Figure, timerange: datetime.timedelta,
+        frequency: str = None):
+    buttons = []
+
+    if frequency in ['H', 'BH']:  # hourly data
+        buttons += [dict(count=1, label='1D', step='day', stepmode='backward'),
+            dict(count=5, label='5D', step='day', stepmode='backward')]
+
+    if frequency in ['H', 'BH', 'B', 'C', 'D']:  # daily data
+        buttons += [dict(count=1, label='1M', step='month', stepmode='backward'),
+            dict(count=3, label='3M', step='month', stepmode='backward')]
+
     # buttons, that are always present
-    buttons = [dict(count=6, label='6M', step='month', stepmode='backward'),
+    buttons += [dict(count=6, label='6M', step='month', stepmode='backward'),
         dict(count=1, label='YTD', step='year', stepmode='todate'),
         dict(count=1, label='1Y', step='year', stepmode='backward')]
 
     # adding buttons depending on input time range
-    years = [1, 2, 5, 10, 20, 50, 100]
+    years = [1, 2, 5]
     for i in range(1, len(years)):
         if timerange.days > years[i-1] * 365:
-            buttons.append(dict(count=years[i], label=f'{years[i]}Y',
-                step='year', stepmode='backward'))
+            buttons += [
+                dict(count=years[i], label=f'{years[i]}Y', step='year', stepmode='backward')]
 
-    buttons.append(dict(label='ALL', step='all'))  # ALL is also always available
+    buttons += [dict(label='ALL', step='all')]  # ALL is also always available
 
     figure.update_xaxes(type='date', rangeslider_visible=False,
         rangeselector=dict(x=0, buttons=buttons, font=dict(color=theme_colors['text_color']),
