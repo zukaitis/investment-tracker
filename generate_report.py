@@ -114,9 +114,12 @@ def calculate_value_change(values: pd.Series,
     data = values.copy().sort_index()
 
     delta = pd.tseries.frequencies.to_offset(settings.value_change_span)
+    day_ago_index = data.index.get_loc(
+        data.index[-1] - datetime.timedelta(days=1), method='nearest')
     # check how recent the data is
-    if ((data.index[-1] - data.index[-2]) <= delta) and ((latest_date - data.index[-1]) <= delta):
-        change = data.values[-1] - data.values[-2]
+    if (((data.index[-1] - data.index[day_ago_index]) <= delta) and
+            ((latest_date - data.index[-1]) <= delta)):
+        change = data.iloc[-1] - data.iloc[day_ago_index]
         if iscurrency:
             if abs(change) >= 0.01:
                 daily_change = currency_str(round(change, 2))
@@ -170,7 +173,7 @@ def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
     print(f'Fetching yfinance data for {symbol}')
     # download extra data, just to be sure, that the requred date will appear on yf dataframe
     start_date = input_data.loc[input_data.index[0], 'date'] - datetime.timedelta(days=7)
-    fine = ticker.history(period='5d', interval='60m')
+    fine = ticker.history(period='5d', interval='60m').astype(float)
     fine.index = fine.index.tz_convert(settings.timezone).tz_localize(None)
     coarse_end_date = fine.index[0].date()
     coarse = ticker.history(start=start_date, end=coarse_end_date, interval='1d')
@@ -193,7 +196,7 @@ def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
         data['return_tax'] = 0.0
     data['return_tax'] = pd.to_numeric(data['return_tax']).interpolate(method='pad').fillna(0.0)
 
-    for p in ['name', 'symbol', 'account', 'group']:
+    for p in ['name', 'symbol', 'account', 'group']: # TODO: move this part out of the method
         if p in data.columns:
             data[p] = input_data.loc[input_data.index[0], p]
 

@@ -11,7 +11,7 @@ class Settings:
     autofill_interval = '1d'
     autofill_price_mark = 'Close'
     theme = 'auto'
-    value_change_span = '3d'
+    value_change_span = '2d'
     relevance_period = '6M'
     timezone = 'UTC'
 
