@@ -177,8 +177,7 @@ def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
     fine.index = fine.index.tz_convert(settings.timezone).tz_localize(None)
     coarse_end_date = fine.index[0].date()
     coarse = ticker.history(start=start_date, end=coarse_end_date, interval='1d')
-    yfdata = pd.merge(coarse, fine, how='outer', on=coarse.columns.to_list(),  # merge all columns
-        left_index=True, right_index=True)
+    yfdata = pd.concat([coarse, fine])
     if ticker.info['currency'] != settings.currency:
         # convert currency, if it differs from the one selected in settings
         currency_ticker = yf.Ticker(f"{ticker.info['currency']}{settings.currency}=X")
