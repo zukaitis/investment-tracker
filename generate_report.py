@@ -159,9 +159,9 @@ def calculate_frequency(dates: pd.Series) -> str:
         frequency = pd.infer_freq(dates.iloc[-4:-1])
     if (frequency == None) and (len(dates) >= 2):
         period = dates.iloc[-1] - dates.iloc[-2]
-        if period < pd.tseries.frequencies.to_offset('2H'):
+        if period < datetime.timedelta(hours=2):
             frequency = 'H'  # hourly
-        elif period < pd.tseries.frequencies.to_offset('2D'):
+        elif period < datetime.timedelta(days=2):
             frequency = 'D'  # daily
     return frequency
 
@@ -585,13 +585,17 @@ def plot_historical_asset_data(input: pd.DataFrame) -> go.Figure:
     fig.update_layout(hoverlabel=dict(bgcolor=theme_colors['tab_background_color'],
         font=dict(color=theme_colors['text_color'])))
     frequency = calculate_frequency(data['date'])
-    configure_historical_dataview(fig, latest_date - input.loc[input.index[0],'date'], frequency)
-    span = '1Y'
-    if frequency in ['H', 'BH']:  # hourly data
-        span = '5D'
-    elif frequency in ['B', 'C', 'D']:  # daily data
-        span = '1M'
-    range = [latest_date - pd.tseries.frequencies.to_offset(span), latest_date]
+    earliest_entry_date = input.loc[input.index[0],'date']
+    latest_entry_date = input.loc[input.index[-1],'date']
+    configure_historical_dataview(fig, latest_date - earliest_entry_date, frequency)
+    span = pd.DateOffset(years=1)
+    if ((frequency in ['H', 'BH'])  # hourly data
+            and (latest_date - latest_entry_date < datetime.timedelta(days=3))):
+        span = pd.DateOffset(days=5)
+    elif ((frequency in ['H', 'BH', 'B', 'C', 'D'])  # daily data
+            and (latest_date - latest_entry_date < datetime.timedelta(days=14))):
+        span = pd.DateOffset(months=1)
+    range = [latest_date - span, latest_date]
     fig.update_xaxes(range=range, rangeslider=dict(visible=True))
     max_value = max(max(data['net_investment']), max(data['value_and_return']))
     fig.update_yaxes(ticksuffix=currency_tick_suffix(), tickprefix=currency_tick_prefix(),
@@ -766,6 +770,7 @@ def append_asset_data_view(input: pd.DataFrame):
     statistics.append(html.Label('Funds invested',
         html.Value(currency_str(last_row['net_investment']), valuechange=c)))
 
+    last_row['return_received'] = round(last_row['return_received'], 2)
     if last_row['return_received'] != 0:
         c = calculate_value_change(data.set_index('date')['return_received'], iscurrency=True)
         statistics.append(html.Label('Return received', html.Value(
