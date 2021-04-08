@@ -747,7 +747,7 @@ def get_overall_figures(statistic: str, label_text: str) -> html.Columns:
         html.Column(content=historical.to_html(
             full_html=False, include_plotlyjs=True))])
 
-def append_asset_data_view(input: pd.DataFrame):
+def create_asset_data_view(input: pd.DataFrame) -> str:
     data = input.copy()
     last_row = data.iloc[-1].to_dict()
 
@@ -855,7 +855,7 @@ def calculate_total_historical_data(input: pd.DataFrame, name: str = 'Total') ->
         asset_data[['id', 'name', 'symbol', 'group', 'account', 'color']] = ''
         group_total = group_total.add(asset_data)
     group_total = process_data(group_total.reset_index())
-    group_total['name'] = name
+    group_total['name'] = f'<i>{name}</i>'
     group_total['symbol'] = np.NaN
     group_total[['price', 'amount']] = 0
     return group_total
@@ -875,7 +875,7 @@ def append_asset_data_tabs(document: html.Document):
                 (group_accounts[0] == ' ') and
                 (group_data['name'].nunique() > 1))):
             group_total = calculate_total_historical_data(group_data, f'{g} Total')
-            content += append_asset_data_view(group_total)
+            content += create_asset_data_view(group_total)
         
         for acc in group_accounts:
             account_data = group_data[group_data['account'] == acc]
@@ -883,12 +883,18 @@ def append_asset_data_tabs(document: html.Document):
 
             if (len(account_assets) > 1) and (acc != ' '):
                 account_total = calculate_total_historical_data(account_data, f'{acc} Total')
-                content += append_asset_data_view(account_total)
+                content += create_asset_data_view(account_total)
 
             for a in account_assets:
-                content += append_asset_data_view(account_data[account_data['name'] == a])
+                content += create_asset_data_view(account_data[account_data['name'] == a])
 
         tabs.append(html.Tab(html.Label(g), content))
+
+    if len(groups) > 1:
+        total = calculate_total_historical_data(assets)
+        content = create_asset_data_view(total)
+        tabs.append(html.Tab(html.Label('<i>Total</i>'), content))
+    
     document.append(html.TabContainer(tabs))
 
 if __name__ == '__main__':
