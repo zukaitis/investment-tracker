@@ -181,8 +181,7 @@ def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
     if ticker.info['currency'] != settings.currency:
         # convert currency, if it differs from the one selected in settings
         currency_ticker = yf.Ticker(f"{ticker.info['currency']}{settings.currency}=X")
-        currency_rate = currency_ticker.history(start=start_date,
-            interval=settings.autofill_interval)
+        currency_rate = currency_ticker.history(start=start_date, interval='1d')
         yfdata[settings.autofill_price_mark] *= currency_rate[settings.autofill_price_mark]
         yfdata['Dividends'] *= currency_rate[settings.autofill_price_mark]
 

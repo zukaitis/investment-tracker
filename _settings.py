@@ -3,70 +3,106 @@ from _common import print_warning
 import babel
 import yfinance as yf
 import pandas as pd
+import inspect
+
+class _Setting:
+    def __init__(self, default, description: str, allowed: list = None):
+        self._value = default
+        self._allowed = allowed
+
+    @property
+    def value(self):
+        return self._value
+
+    @value.setter
+    def value(self, value):
+        if self.is_value_allowed(value):
+            self._value = value
+        else:
+            raise ValueError
+
+    @property
+    def allowed(self):
+        return self._allowed
+
+    def is_value_allowed(self, value) -> bool:
+        try:
+            if False == self._is_allowed(value):
+                raise ValueError
+        except:
+            return False
+        return True
+
+    def _is_allowed(self, value) -> bool:
+        if (None != self._allowed) and (value not in self._allowed):
+            return False
+        return True
+
+class _Currency(_Setting):
+    def _is_allowed(self, value) -> bool:
+        yf.Ticker(f'{value}=X').info
+        return True
+
+class _Locale(_Setting):
+    def _is_allowed(self, value) -> bool:
+        return babel.localedata.exists(value)
+
+class _Period(_Setting):
+    def _is_allowed(self, value) -> bool:
+        pd.tseries.frequencies.to_offset(value)
+        return True
+
+class _Timezone(_Setting):
+    def _is_allowed(self, value) -> bool:
+        pd.Timestamp().astimezone(value)
+        return True
+
+class _Name(_Setting):
+    @_Setting.value.setter
+    def value(self, value: str):
+        self._value = f"{value}'s"
 
 class Settings:
-    owner = 'Your'
-    currency = 'EUR'
-    locale = 'en_US_POSIX'
-    autofill_interval = '1d'
-    autofill_price_mark = 'Close'
-    theme = 'auto'
-    value_change_span = '2d'
-    relevance_period = '6M'
-    timezone = 'UTC'
+    owner = _Name(default='Your',
+        description='Name of the portfolio owner, which will be displayed in the title')
+    currency = _Currency(default='EUR',
+        description='Currency, in which all the input data is specified')
+    locale = _Locale(default='en_US_POSIX',
+        description='Locale, which determines, how numbers are displayed')
+    autofill_price_mark = _Setting(default='Close',
+        description='Selects, which value column to use, when fetching financial data',
+        allowed=['Open', 'Close', 'High', 'Low'])
+    theme = _Setting(default='auto', description='Color scheme to be used in the report',
+        allowed=['light', 'dark', 'auto'])
+    value_change_span = _Period(default='2d',
+        description='Selects, how recent and frequent data entries have to be, '
+            'to display value change')
+    relevance_period = _Period(default='6M',
+        description='Selects, how recent and frequent data entries have to be, '
+            'for data be considered relevant')
+    timezone = _Timezone(default='UTC', description='Time zone, used in the report')
+
+    def __init__(self):
+        for s in self:  # copy all class variables to instance
+            self.__dict__[s] = getattr(Settings, s)
 
     def __setattr__(self, name, value):
-        if name == 'owner':
-            self.__dict__[name] = f"{value}'s"
-        elif name == 'currency':
-            try:
-                yf.Ticker(f'{value}=X').info
-            except ValueError:
-                print_warning(f'Unknown currency - "{value}"')
-            else:
-                self.__dict__[name] = value
-        elif name == 'locale':
-            if babel.localedata.exists(value):
-                self.__dict__[name] = value
-            else:
-                print_warning(f'Unknown locale - "{value}"')
-        elif name == 'autofill_interval':
-            allowed = ['1d', '5d', '1wk', '1mo', '3mo']
-            if value in allowed:
-                self.__dict__[name] = value
-            else:
-                print_warning(f'Unknown interval - "{value}". Allowed intervals: {allowed}')
-        elif name == 'autofill_price_mark':
-            allowed = ['Open', 'Close', 'High', 'Low']
-            if value in allowed:
-                self.__dict__[name] = value
-            else:
-                print_warning(f'Unknown price mark - "{value}". Allowed marks: {allowed}')
-        elif name == 'theme':
-            allowed = ['light', 'dark', 'auto']
-            if value in allowed:
-                self.__dict__[name] = value
-            else:
-                print_warning(f'Unknown theme - "{value}". Allowed themes: {allowed}')
-        elif name == 'value_change_span':
-            try:
-                pd.tseries.frequencies.to_offset(value)
-            except ValueError:
-                print_warning(f'Unrecognized value change span - {value}')
-            else:
-                self.__dict__[name] = value
-        elif name == 'relevance_period':
-            try:
-                pd.tseries.frequencies.to_offset(value)
-            except ValueError:
-                print_warning(f'Unrecognized relevance period - {value}')
-            else:
-                self.__dict__[name] = value
-        elif name not in self:
-            print_warning(f'No such setting - "{name}"')
+        if name not in self:
+            print_warning(f'No such setting: "{name}"')
         else:
-            self.__dict__[name] = value
+            try:
+                self.__dict__[name].value = value
+            except ValueError:
+                message = f'Unrecognized {name.replace("_", " ")}: "{value}".'
+                if None != self.__dict__[name].allowed:
+                    message += f' Allowed values: {self.__dict__[name].allowed}'
+                print_warning(message)
+
+    def __getattribute__(self, name):
+        if '__dict__' == name:  # call from __iter__()
+            return super(Settings, self).__getattribute__(name)
+        return super(Settings, self).__getattribute__(name).value
 
     def __iter__(self):
-        variables = [d for d in dir(self) if not d.startswith('_')]
+        variables = [d for d in dir(Settings) if not d.startswith('_')]
         return iter(variables)
