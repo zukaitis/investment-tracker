@@ -8,7 +8,8 @@ import inspect
 class _Setting:
     def __init__(self, default, description: str, allowed: list = None):
         self._value = default
-        self._allowed = allowed
+        self.allowed = allowed
+        self.description = description
 
     @property
     def value(self):
@@ -21,10 +22,6 @@ class _Setting:
         else:
             raise ValueError
 
-    @property
-    def allowed(self):
-        return self._allowed
-
     def is_value_allowed(self, value) -> bool:
         try:
             if False == self._is_allowed(value):
@@ -34,7 +31,7 @@ class _Setting:
         return True
 
     def _is_allowed(self, value) -> bool:
-        if (None != self._allowed) and (value not in self._allowed):
+        if (None != self.allowed) and (value not in self.allowed):
             return False
         return True
 
@@ -99,10 +96,17 @@ class Settings:
                 print_warning(message)
 
     def __getattribute__(self, name):
-        if '__dict__' == name:  # call from __iter__()
-            return super(Settings, self).__getattribute__(name)
+        if ('__dict__' == name) or callable(super(Settings, self).__getattribute__(name)):
+            return super(Settings, self).__getattribute__(name)  # call from __iter__()
         return super(Settings, self).__getattribute__(name).value
 
     def __iter__(self):
-        variables = [d for d in dir(Settings) if not d.startswith('_')]
+        variables = [d for d in dir(Settings)
+            if not (d.startswith('_') or callable(getattr(Settings, d)))]
         return iter(variables)
+
+    def get_description(self, name: str):
+        return super(Settings, self).__getattribute__(name).description
+
+    def get_allowed(self, name: str):
+        return super(Settings, self).__getattribute__(name).allowed

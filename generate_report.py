@@ -901,12 +901,14 @@ if __name__ == '__main__':
     warnings.formatwarning = lambda msg, *args, **kwargs: f'{msg}\n'
 
     settings = Settings()
+    default_input_dir = f'{os.path.dirname(os.path.realpath(__file__))}{os.path.sep}input_data'
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('input_dir', type=str, nargs='?',
-        default=f'{os.path.dirname(os.path.realpath(__file__))}{os.path.sep}input_data')
+    parser.add_argument('--input_dir', '-i', type=str, default=default_input_dir,
+        help='Directory, containing input files')
     for s in settings:  # all settings are possible arguments
-        parser.add_argument(f'--{s}', type=type(getattr(settings, s)))
+        parser.add_argument(f'--{s}', type=type(getattr(settings, s)),
+            help=settings.get_description(s), choices=settings.get_allowed(s))
     arguments = parser.parse_args()
     for s in settings:
         if (getattr(arguments, s) != None):
@@ -924,8 +926,8 @@ if __name__ == '__main__':
                 for s in input:
                     setattr(settings, s, input[s])
                 if settings_found == 'yes':
-                    print_warning(f'Multiple settings files detected, expect trouble')
-                    settings_found = 'warned'
+                    print_warning('Multiple settings files detected, expect trouble')
+                    settings_found = 'warned'  # three states, so warning would only pop once
                 elif settings_found == 'no':
                     settings_found = 'yes'
 
