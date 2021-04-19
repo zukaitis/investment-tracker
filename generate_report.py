@@ -178,12 +178,16 @@ def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
     coarse_end_date = fine.index[0].date()
     coarse = ticker.history(start=start_date, end=coarse_end_date, interval='1d')
     yfdata = pd.concat([coarse, fine])
-    if ticker.info['currency'] != settings.currency:
-        # convert currency, if it differs from the one selected in settings
-        currency_ticker = yf.Ticker(f"{ticker.info['currency']}{settings.currency}=X")
-        currency_rate = currency_ticker.history(start=start_date, interval='1d')
-        yfdata[settings.autofill_price_mark] *= currency_rate[settings.autofill_price_mark]
-        yfdata['Dividends'] *= currency_rate[settings.autofill_price_mark]
+    if 'currency' in ticker.info:
+        if ticker.info['currency'] != settings.currency:
+            # convert currency, if it differs from the one selected in settings
+            currency_ticker = yf.Ticker(f"{ticker.info['currency']}{settings.currency}=X")
+            currency_rate = currency_ticker.history(start=start_date, interval='1d')
+            yfdata[settings.autofill_price_mark] *= currency_rate[settings.autofill_price_mark]
+            yfdata['Dividends'] *= currency_rate[settings.autofill_price_mark]
+    else:
+        print_warning('Ticker currency info is missing. '
+            f'Assuming, that ticker currency matches input currency ({settings.currency})')
 
     yfdata = yfdata.reset_index().rename(columns={'index':'date',
         settings.autofill_price_mark:'price'})
