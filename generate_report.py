@@ -174,8 +174,10 @@ def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
     # download extra data, just to be sure, that the requred date will appear on yf dataframe
     start_date = input_data.loc[input_data.index[0], 'date'] - datetime.timedelta(days=7)
     fine = ticker.history(period='5d', interval='60m').astype(float)
-    fine.index = fine.index.tz_convert(settings.timezone).tz_localize(None)
-    coarse_end_date = fine.index[0].date()
+    coarse_end_date = None
+    if len(fine) > 0:
+        fine.index = fine.index.tz_convert(settings.timezone).tz_localize(None)
+        coarse_end_date = fine.index[0].date()
     coarse = ticker.history(start=start_date, end=coarse_end_date, interval='1d')
     yfdata = pd.concat([coarse, fine])
     if 'currency' in ticker.info:
@@ -189,7 +191,7 @@ def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
         print_warning('Ticker currency info is missing. '
             f'Assuming, that ticker currency matches input currency ({settings.currency})')
 
-    yfdata = yfdata.reset_index().rename(columns={'index':'date',
+    yfdata = yfdata.reset_index().rename(columns={'index':'date', 'Date':'date',
         settings.autofill_price_mark:'price'})
 
     data = pd.merge(data, yfdata, on='date', how='outer').sort_values(by=['date'])
