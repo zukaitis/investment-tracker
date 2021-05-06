@@ -15,10 +15,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v1
-      - name: Install setuptools
-        run: pip3 install setuptools
       - name: Install Python packages
-        run: pip3 install pandas numpy plotly yfinance babel dominate dataclasses
+        run: pip3 install -r requirements.txt
       - name: Generate Report
         run: ./generate_report.py
       - name: Get Date

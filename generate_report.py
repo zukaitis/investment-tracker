@@ -214,10 +214,7 @@ def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
     return data
 
 def process_data(input_data, discard_zero_values: bool = True) -> pd.DataFrame:
-    if type(input_data) is pd.DataFrame:
-        data = input_data.copy()
-    else:
-        data = pd.DataFrame(input_data)
+    data = input_data.copy() if (type(input_data) is pd.DataFrame) else pd.DataFrame(input_data)
 
     data['date'] = pd.to_datetime(data['date'])
     if data.duplicated(subset='date').any():
