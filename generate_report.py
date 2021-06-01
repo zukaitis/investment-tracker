@@ -885,6 +885,7 @@ def append_asset_data_tabs(document: html.Document):
                 (group_data['name'].nunique() > 1))):
             group_total = calculate_total_historical_data(group_data, f'{g} Total')
             content += create_asset_data_view(group_total)
+            content += html.Divider() + html.Divider()  # double divider after Total
         
         for acc in group_accounts:
             account_data = group_data[group_data['account'] == acc]
@@ -893,9 +894,15 @@ def append_asset_data_tabs(document: html.Document):
             if (len(account_assets) > 1) and (acc != ' '):
                 account_total = calculate_total_historical_data(account_data, f'{acc} Total')
                 content += create_asset_data_view(account_total)
+                content += html.Divider()
 
             for a in account_assets:
                 content += create_asset_data_view(account_data[account_data['name'] == a])
+                if a != account_assets[-1]:  # add a divider, unless it's the last asset
+                    content += html.Divider()
+
+            if acc != group_accounts[-1]:  # add a double divider, unless it's the last account
+                content += html.Divider() + html.Divider()
 
         tabs.append(html.Tab(html.Label(g), content))
 

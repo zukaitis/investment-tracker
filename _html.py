@@ -29,6 +29,12 @@ class _HtmlObject:
     def __str__(self):
         return self._raw
 
+    def __add__(self, other):
+        return str(self) + other
+
+    def __radd__(self, other):
+        return other + str(self)
+
 class Document:
     def __init__(self, title: str, css_variables: dict):
         self._document = dominate.document(title=title)
@@ -37,13 +43,6 @@ class Document:
         self._append_css_variables_to_head(css_variables)
         self._append_file_to_head('style.css')
         self._document.head += raw('</style>')
-        # self._document += raw('<input type="checkbox" id="pompa" name="pompa">')
-        # self._document += raw('<label for="pompa" class="button_image0">')
-        # self._document += raw(Path('calendar_month_nu.svg').read_text())
-        # self._document += raw('</label>')
-        # self._document += raw('<label for="pompa" class="button_image1">')
-        # self._document += raw(Path('calendar_day_nu.svg').read_text())
-        # self._document += raw('</label>')
 
     def append(self, obj: typing.Union[_HtmlObject, str]):
         self._document += raw(str(obj))
@@ -194,3 +193,7 @@ class Button(_HtmlObject):
         self._raw += f'<label for="{identifier}" class="{identifier}_checked">'
         self._raw += Path(image_alternate).read_text()
         self._raw += f'</label>'
+
+class Divider(_HtmlObject):
+    def __init__(self):
+        self._raw = '<hr>'

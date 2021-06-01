@@ -47,6 +47,16 @@ h2 {
     margin: 0em;
 }
 
+hr {
+    width: 98%;
+    border-top: 1px solid var(--background_color);  /* text color gives too much contrast one one pixel scale */
+    border-bottom: none;
+    border-left: none;
+    border-right: none;
+    margin-top: 1px;
+    margin-bottom: 1px;
+}
+
 .tab_container {
     width: 98%;
     margin: 0 auto;
@@ -129,13 +139,7 @@ input, section {
     opacity: 1;
 }
 
-input#pompa { display: none; }
-
 .button_image0 { display: none; }
-
-input#pompa:checked ~ .button_image0 { display: initial; }
-
-input#pompa:checked ~ .button_image1 { display: none; }
 
 .tab_container .tab-content p,
 .tab_container .tab-content h3,
