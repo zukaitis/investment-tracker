@@ -4,5 +4,5 @@ symbol: FISH.JK
 account: Local Bank
 group: Stocks
 data:
-  - { date: 2018-11-07 }  # specifying date only should make price history visible from this date
+  - { date: 2018-11-07, comment: "Specifying date only should make price history visible from this date" }
   - { date: 2019-11-07, investment: +200, amount: 1060, return_tax: 0.1 }

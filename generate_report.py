@@ -603,7 +603,7 @@ def plot_historical_asset_data(input: pd.DataFrame) -> go.Figure:
     fig.update_yaxes(ticksuffix=currency_tick_suffix(), tickprefix=currency_tick_prefix(),
         range=[0, max_value * 1.05])
 
-    if contains_non_zero_values(data['price']):
+    if contains_non_zero_values(data['price']):  # check if price data is present
         data['price_string'] = data['price'].apply(currency_str)
         fig.add_trace(go.Scatter(x=data['date'], y=data['price'],
             mode='lines', name='Price', marker=dict(color=cyan), yaxis='y2',
@@ -615,6 +615,14 @@ def plot_historical_asset_data(input: pd.DataFrame) -> go.Figure:
             ticksuffix=currency_tick_suffix(), tickprefix=currency_tick_prefix(), side='right',
             range=[min(data['price']) - margin, max(data['price']) + margin]))
         fig.update_layout(margin=dict(r=2))
+
+    comments = data[pd.notnull(data['comment'])]
+    
+    fig.add_trace(go.Scatter(x=comments['date'],
+        y=[max_value * 0.05]*len(comments),  # display comment mark at 5% of max y value
+        mode='markers', marker=dict(line=dict(width=2, color='purple'), size=12,
+        symbol='asterisk'), customdata=comments['comment'],
+        hovertemplate=f'<b>*</b> %{{customdata}}<extra></extra>', showlegend=False))
 
     return fig
 
@@ -756,7 +764,7 @@ def create_asset_data_view(input: pd.DataFrame) -> str:
     title = last_row['name']
     if ('symbol' in last_row) and (pd.notnull(last_row['symbol'])):
         title += f" ({last_row['symbol']})"
-    if 'account' in last_row:
+    if ('account' in last_row) and (pd.notnull(last_row['account'])):
         title += f"<br>{last_row['account']}"
     output = f'<h2>{title}</h2>'
 
@@ -849,16 +857,15 @@ def calculate_total_historical_data(input: pd.DataFrame, name: str = 'Total') ->
     all_dates = data.groupby('date').tail(1)['date']
     group_total = pd.DataFrame(columns=assets.columns).set_index(
         'date').reindex(all_dates).fillna(0)
-    group_total[['id', 'name', 'symbol', 'group', 'account', 'color']] = ''
+    group_total[['id', 'name', 'symbol', 'group', 'account', 'color', 'comment']] = np.NaN
     for a in group_assets:
         asset_data = process_data(data[data['id'] == a].set_index(
             'date').reindex(all_dates).reset_index(), discard_zero_values=False)
         asset_data = asset_data.set_index('date').fillna(0)
-        asset_data[['id', 'name', 'symbol', 'group', 'account', 'color']] = ''
+        asset_data[['id', 'name', 'symbol', 'group', 'account', 'color', 'comment']] = np.NaN
         group_total = group_total.add(asset_data)
     group_total = process_data(group_total.reset_index())
     group_total['name'] = f'<i>{name}</i>'
-    group_total['symbol'] = np.NaN
     group_total[['price', 'amount']] = 0
     return group_total
 
