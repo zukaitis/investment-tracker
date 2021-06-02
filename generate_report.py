@@ -200,7 +200,7 @@ def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
         data['return_tax'] = 0.0
     data['return_tax'] = pd.to_numeric(data['return_tax']).interpolate(method='pad').fillna(0.0)
 
-    for p in ['name', 'symbol', 'account', 'group']: # TODO: move this part out of the method
+    for p in ['name', 'symbol', 'account', 'group', 'info']: # TODO: move this part out of the method
         if p in data.columns:
             data[p] = input_data.loc[input_data.index[0], p]
 
@@ -766,8 +766,11 @@ def create_asset_data_view(input: pd.DataFrame) -> str:
         title += f" ({last_row['symbol']})"
     if ('account' in last_row) and (pd.notnull(last_row['account'])):
         title += f"<br>{last_row['account']}"
-    output = f'<h2>{title}</h2>'
 
+    if type(last_row['info']) is not str:
+        last_row['info'] = ''
+    output = html.Columns([html.Column(width=50, content=html.Heading2(title)),
+        html.Column(content=html.Paragraph(last_row['info']))])
     statistics = []
 
     if contains_non_zero_values(data['value']):
@@ -776,9 +779,11 @@ def create_asset_data_view(input: pd.DataFrame) -> str:
         statistics.append(html.Label('Value',
             html.Value(currency_str(last_row['value']), valuechange=c)))
 
-    c = calculate_value_change(data.set_index('date')['net_investment'], iscurrency=True)
-    statistics.append(html.Label('Funds invested',
-        html.Value(currency_str(last_row['net_investment']), valuechange=c)))
+    # don't display Funds invested, if asset was sold
+    if not ((contains_non_zero_values(data['value'])) and (last_row['value'] == 0)):
+        c = calculate_value_change(data.set_index('date')['net_investment'], iscurrency=True)
+        statistics.append(html.Label('Funds invested',
+            html.Value(currency_str(last_row['net_investment']), valuechange=c)))
 
     last_row['return_received'] = round(last_row['return_received'], 2)
     if last_row['return_received'] != 0:
@@ -857,12 +862,13 @@ def calculate_total_historical_data(input: pd.DataFrame, name: str = 'Total') ->
     all_dates = data.groupby('date').tail(1)['date']
     group_total = pd.DataFrame(columns=assets.columns).set_index(
         'date').reindex(all_dates).fillna(0)
-    group_total[['id', 'name', 'symbol', 'group', 'account', 'color', 'comment']] = np.NaN
+    # TODO: fix this stuff in BS data handling, as it's growing out of control
+    group_total[['id', 'name', 'symbol', 'group', 'account', 'color', 'comment', 'info']] = np.NaN
     for a in group_assets:
         asset_data = process_data(data[data['id'] == a].set_index(
             'date').reindex(all_dates).reset_index(), discard_zero_values=False)
         asset_data = asset_data.set_index('date').fillna(0)
-        asset_data[['id', 'name', 'symbol', 'group', 'account', 'color', 'comment']] = np.NaN
+        asset_data[['id', 'name', 'symbol', 'group', 'account', 'color', 'comment', 'info']] = np.NaN
         group_total = group_total.add(asset_data)
     group_total = process_data(group_total.reset_index())
     group_total['name'] = f'<i>{name}</i>'
@@ -959,7 +965,8 @@ if __name__ == '__main__':
                     info = pd.DataFrame(input)
                 except ValueError:
                     info = pd.DataFrame()  # create empty dataframe in case of an error in input
-                if 'data' in info.columns: # protection against files with no data
+
+                if 'data' in info.columns:  # protection against files with no data
                     info.drop(columns=['data'], inplace=True)
                     data = pd.DataFrame(input['data']).join(info)
                     data = process_data(data)

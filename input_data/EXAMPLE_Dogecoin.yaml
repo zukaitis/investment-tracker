@@ -3,6 +3,20 @@ name: Dogecoin
 symbol: DOGE-USD
 account: Some crypto exchange site
 group: Cryptocurrency
+info: >
+  This is the longest info text from all the examples. It has no valuable information, serves no
+  other purpose, than to see, how line limitation works in html. To achieve the line limitation,
+  webkit-line-clamp is used. I don't know, if it's the best way to do it, but hopefully it will
+  work well, and I won't have to spend more time on it. As the readers might see, one could put
+  quite a lot of information in this section, without it being clamped. Hopefully, this will be
+  enough soon, as when writing this I'm starting to lose the creativity, needed to continue this
+  inane text. However, I'm quite certain, that if someone's going to view this on 4k monitor, this
+  sentense will still be visible, and I should continue writing this horrible test essay. One might
+  say, that I could achieve the same effect by copying Lorem Ipsum, or whatever it's called, but
+  where's the fun in that? If you're still reading this nonsense, I would advise you to rethink
+  your life choices, and maybe start reading a book or even some dumb magazine, you would get much
+  more from that, rather than this text. One more think I would like to check, if tooltips showing
+  the full text are implemented by default, or will I have to do that myself. That's it.
 data:
-  - { date: "Dec 28, 2019", investment: +50, amount: 55555 }
-  - { date: "Dec 18, 2019", investment: +50, amount: 27777 }
+  - { date: "May 5, 2021", investment: +50, amount: 75.75756 }
+  - { date: "May 8, 2021", investment: +50, amount: 151.51515 }

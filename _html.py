@@ -197,3 +197,11 @@ class Button(_HtmlObject):
 class Divider(_HtmlObject):
     def __init__(self):
         self._raw = '<hr>'
+
+class Heading2(_HtmlObject):
+    def __init__(self, text: str):
+        self._raw = f'<h2>{text}</h2>'
+
+class Paragraph(_HtmlObject):
+    def __init__(self, text: str):
+        self._raw = f'<p class="asset_info">{text}</p>'
