@@ -863,12 +863,12 @@ def calculate_total_historical_data(input: pd.DataFrame, name: str = 'Total') ->
     group_total = pd.DataFrame(columns=assets.columns).set_index(
         'date').reindex(all_dates).fillna(0)
     # TODO: fix this stuff in BS data handling, as it's growing out of control
-    group_total[['id', 'name', 'symbol', 'group', 'account', 'color', 'comment', 'info']] = np.NaN
+    group_total[['id', 'name', 'symbol', 'group', 'account', 'color', 'comment', 'info']] = np.nan
     for a in group_assets:
         asset_data = process_data(data[data['id'] == a].set_index(
             'date').reindex(all_dates).reset_index(), discard_zero_values=False)
         asset_data = asset_data.set_index('date').fillna(0)
-        asset_data[['id', 'name', 'symbol', 'group', 'account', 'color', 'comment', 'info']] = np.NaN
+        asset_data[['id', 'name', 'symbol', 'group', 'account', 'color', 'comment', 'info']] = np.nan
         group_total = group_total.add(asset_data)
     group_total = process_data(group_total.reset_index())
     group_total['name'] = f'<i>{name}</i>'
@@ -1020,6 +1020,8 @@ if __name__ == '__main__':
                 current_stats = current_stats[i != current_stats['id']]
 
     assets['active'] = assets['id'].isin(current_stats['id'])
+    if 'comment' not in assets:
+        assets['comment'] = np.nan
     monthly_data = calculate_monthly_values(assets)
 
     if settings.theme == 'auto':
