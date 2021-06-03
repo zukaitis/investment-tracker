@@ -876,14 +876,22 @@ def calculate_total_historical_data(input: pd.DataFrame, name: str = 'Total') ->
     return group_total
 
 def append_asset_data_tabs(document: html.Document):
-    groups = sorted(assets['group'].unique())
+    groups = assets.groupby('id').tail(1).groupby('group')[['group', 'value', 'active']]
+    groups = groups.agg({'value': 'sum', 'active': 'any'}).reset_index()
+    groups.sort_values(by=['value', 'active'], inplace=True, ascending=False)
+    groups = groups['group'].unique()
+
     tabs = []
     for g in groups:
         content = ''
 
         group_data = assets[assets['group'] == g]
-        group_accounts = sorted(group_data['account'].unique())
-        
+        group_assets = group_data.groupby('id').tail(1)
+        group_accounts = group_assets.groupby('account')[['account', 'value', 'active']]
+        group_accounts = group_accounts.agg({'value': 'sum', 'active': 'any'}).reset_index()
+        group_accounts.sort_values(by=['value', 'active'], inplace=True, ascending=False)
+        group_accounts = group_accounts['account'].unique()
+
         # display group total if there is more than one account, or only "mixed" account
         if ((len(group_accounts) > 1) or
                 ((len(group_accounts) == 1) and
