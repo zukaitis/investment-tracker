@@ -767,7 +767,7 @@ def create_asset_data_view(input: pd.DataFrame) -> str:
     if ('account' in last_row) and (pd.notnull(last_row['account'])):
         title += f"<br>{last_row['account']}"
 
-    if type(last_row['info']) is not str:
+    if ('info' not in last_row) or (type(last_row['info']) is not str):
         last_row['info'] = ''
     output = html.Columns([html.Column(width=50, content=html.Heading2(title)),
         html.Column(content=html.Paragraph(last_row['info']))])
