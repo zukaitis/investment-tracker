@@ -814,7 +814,7 @@ def create_asset_data_view(input: pd.DataFrame) -> str:
 
 def append_overall_data_tabs(document: html.Document):
     # calculate total using only currently active values
-    total = calculate_total_historical_data(assets[assets['id'].isin(current_stats['id'])])
+    total = calculate_total_historical_data(assets[assets['active']])
     last_row = total.iloc[-1].to_dict()
 
     tabs = []
@@ -895,7 +895,9 @@ def append_asset_data_tabs(document: html.Document):
         
         for acc in group_accounts:
             account_data = group_data[group_data['account'] == acc]
-            account_assets = sorted(account_data['name'].unique())
+            account_assets = account_data.groupby('name').tail(1).copy()
+            account_assets.sort_values(by=['value', 'active'], inplace=True, ascending=False)
+            account_assets = account_assets['name'].unique()
 
             if (len(account_assets) > 1) and (acc != ' '):
                 account_total = calculate_total_historical_data(account_data, f'{acc} Total')
@@ -915,7 +917,7 @@ def append_asset_data_tabs(document: html.Document):
     if len(groups) > 1:
         total = calculate_total_historical_data(assets)
         content = create_asset_data_view(total)
-        tabs.append(html.Tab(html.Label('<i>Total</i>'), content))
+        tabs.append(html.Tab(html.Label('<i>Total</i>'), content, checked=True))
     
     document.append(html.TabContainer(tabs))
 
@@ -1009,6 +1011,7 @@ if __name__ == '__main__':
                     pd.tseries.frequencies.to_offset(settings.relevance_period)):
                 current_stats = current_stats[i != current_stats['id']]
 
+    assets['active'] = assets['id'].isin(current_stats['id'])
     monthly_data = calculate_monthly_values(assets)
 
     if settings.theme == 'auto':
