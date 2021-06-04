@@ -211,6 +211,12 @@ def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
     if 'return' not in data.columns:
         data['return'] = data['amount'] * data['Dividends'].fillna(0.0) * (1 - data['return_tax'])
 
+    if 'info' not in data.columns:
+        if 'description' in ticker.info:
+            data['info'] = ticker.info['description']
+        elif 'longBusinessSummary' in ticker.info:
+            data['info'] = ticker.info['longBusinessSummary']
+
     return data
 
 def process_data(input_data, discard_zero_values: bool = True) -> pd.DataFrame:
