@@ -4,6 +4,7 @@ import babel
 import yfinance as yf
 import pandas as pd
 import inspect
+import pytz
 
 class _Setting:
     def __init__(self, default, description: str, allowed: list = None):
@@ -51,8 +52,7 @@ class _Period(_Setting):
 
 class _Timezone(_Setting):
     def _is_allowed(self, value) -> bool:
-        pd.Timestamp().astimezone(value)
-        return True
+        return (value in pytz.all_timezones)
 
 class _Name(_Setting):
     @_Setting.value.setter

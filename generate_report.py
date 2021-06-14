@@ -100,9 +100,7 @@ def percentage_tick_suffix() -> str:
     return '%'
 
 def contains_non_zero_values(column: pd.Series) -> bool:
-    if any((column.values != 0) & (pd.notna(column.values))):
-        return True
-    return False
+    return any((column.values != 0) & (pd.notna(column.values)))
 
 def calculate_value_change(values: pd.Series,
         iscurrency: bool = False, ispercentage: bool = False) -> html.ValueChange:
@@ -231,7 +229,8 @@ def process_data(input_data, discard_zero_values: bool = True) -> pd.DataFrame:
     data.sort_values(by=['date'], inplace=True)
 
     if (('investment' in data.columns) and ('amount' in data.columns) and 
-        ('price' not in data.columns) and ('value' not in data.columns)):
+            ('price' not in data.columns) and ('value' not in data.columns) and
+            (not discard_zero_values)):
         data = autofill(data)
     else:  # process data the old way. TODO: move this to separate method
         if 'investment' in data.columns:
@@ -395,7 +394,7 @@ def plot_sunburst(input: pd.DataFrame, values: str, label_text: str):
     graph_data.loc[graph_data['label'] == 'Unprofitable', 'color'] = 'red'
 
     return go.Sunburst(labels=graph_data['label'], ids=graph_data['id'],
-        parents=graph_data['parent'], values=graph_data['value'],
+        parents=graph_data['parent'], values=graph_data['value'], sort=False,
         customdata=graph_data['display_string'], marker=dict(colors=graph_data['color']),
         branchvalues='total', hovertemplate=
             f'<b>%{{label}}</b><br>{label_text}: %{{customdata}}<extra></extra>')
