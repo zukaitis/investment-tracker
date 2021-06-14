@@ -229,8 +229,7 @@ def process_data(input_data, discard_zero_values: bool = True) -> pd.DataFrame:
     data.sort_values(by=['date'], inplace=True)
 
     if (('investment' in data.columns) and ('amount' in data.columns) and 
-            ('price' not in data.columns) and ('value' not in data.columns) and
-            (not discard_zero_values)):
+            ('price' not in data.columns) and ('value' not in data.columns)):
         data = autofill(data)
     else:  # process data the old way. TODO: move this to separate method
         if 'investment' in data.columns:
