@@ -2,7 +2,8 @@
 
 import _html as html
 from _settings import Settings
-from _common import print_warning
+import _report as report
+import _historical_data as historical_data
 
 import os
 import yaml
@@ -13,7 +14,6 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import plotly.io
-import yfinance as yf
 from dataclasses import dataclass
 import dataclasses
 import babel.numbers
@@ -167,30 +167,12 @@ def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
     data = input_data.copy()
 
     symbol = input_data.loc[input_data.index[0], 'symbol']
-    ticker = yf.Ticker(symbol)
     print(f'Fetching yfinance data for {symbol}')
     # download extra data, just to be sure, that the requred date will appear on yf dataframe
     start_date = input_data.loc[input_data.index[0], 'date'] - datetime.timedelta(days=7)
-    fine = ticker.history(period='5d', interval='60m').astype(float)
-    coarse_end_date = None
-    if len(fine) > 0:
-        fine.index = fine.index.tz_convert(settings.timezone).tz_localize(None)
-        coarse_end_date = fine.index[0].date()
-    coarse = ticker.history(start=start_date, end=coarse_end_date, interval='1d')
-    yfdata = pd.concat([coarse, fine])
-    if 'currency' in ticker.info:
-        if ticker.info['currency'] != settings.currency:
-            # convert currency, if it differs from the one selected in settings
-            currency_ticker = yf.Ticker(f"{ticker.info['currency']}{settings.currency}=X")
-            currency_rate = currency_ticker.history(start=start_date, interval='1d')
-            yfdata[settings.autofill_price_mark] *= currency_rate[settings.autofill_price_mark]
-            yfdata['Dividends'] *= currency_rate[settings.autofill_price_mark]
-    else:
-        print_warning('Ticker currency info is missing. '
-            f'Assuming, that ticker currency matches input currency ({settings.currency})')
-
-    yfdata = yfdata.reset_index().rename(columns={'index':'date', 'Date':'date',
-        settings.autofill_price_mark:'price'})
+    yfdata = historical_data.get(symbol=symbol, start_date=start_date, settings=settings)
+    if 'info' in data.columns:
+        yfdata.drop('info', axis=1, inplace=True)
 
     data = pd.merge(data, yfdata, on='date', how='outer').sort_values(by=['date'])
 
@@ -199,7 +181,7 @@ def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
     data['return_tax'] = pd.to_numeric(data['return_tax']).interpolate(method='pad').fillna(0.0)
 
     for p in ['name', 'symbol', 'account', 'group', 'info']: # TODO: move this part out of the method
-        if p in data.columns:
+        if p in input_data.columns:
             data[p] = input_data.loc[input_data.index[0], p]
 
     data['amount'] = pd.to_numeric(data['amount']).interpolate(method='pad').fillna(0.0)
@@ -207,13 +189,7 @@ def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
     data['investment'] = pd.to_numeric(data['investment']).fillna(0.0)
     data['value'] = data['amount'] * data['price']
     if 'return' not in data.columns:
-        data['return'] = data['amount'] * data['Dividends'].fillna(0.0) * (1 - data['return_tax'])
-
-    if 'info' not in data.columns:
-        if 'description' in ticker.info:
-            data['info'] = ticker.info['description']
-        elif 'longBusinessSummary' in ticker.info:
-            data['info'] = ticker.info['longBusinessSummary']
+        data['return'] = data['amount'] * data['dividends'].fillna(0.0) * (1 - data['return_tax'])
 
     return data
 
@@ -224,7 +200,7 @@ def process_data(input_data, discard_zero_values: bool = True) -> pd.DataFrame:
     if data.duplicated(subset='date').any():
         dataset_name = data.loc[data.index[0], 'name']
         duplicates = data.loc[data.duplicated(subset='date'), 'date']
-        print_warning(f'There are duplicate dates in "{dataset_name}" dataset:\n{duplicates}')
+        report.warn(f'There are duplicate dates in "{dataset_name}" dataset:\n{duplicates}')
         data.drop_duplicates(subset=['date'], inplace=True)
     data.sort_values(by=['date'], inplace=True)
 
@@ -963,7 +939,7 @@ if __name__ == '__main__':
                 for s in input:
                     setattr(settings, s, input[s])
                 if settings_found == 'yes':
-                    print_warning('Multiple settings files detected, expect trouble')
+                    report.warn('Multiple settings files detected, expect trouble')
                     settings_found = 'warned'  # three states, so warning would only pop once
                 elif settings_found == 'no':
                     settings_found = 'yes'

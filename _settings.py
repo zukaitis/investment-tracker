@@ -1,4 +1,4 @@
-from _common import print_warning
+import _report as report
 
 import babel
 import yfinance as yf
@@ -85,7 +85,7 @@ class Settings:
 
     def __setattr__(self, name, value):
         if name not in self:
-            print_warning(f'No such setting: "{name}"')
+            report.warn(f'No such setting: "{name}"')
         else:
             try:
                 self.__dict__[name].value = value
@@ -93,7 +93,7 @@ class Settings:
                 message = f'Unrecognized {name.replace("_", " ")}: "{value}".'
                 if None != self.__dict__[name].allowed:
                     message += f' Allowed values: {self.__dict__[name].allowed}'
-                print_warning(message)
+                report.warn(message)
 
     def __getattribute__(self, name):
         if ('__dict__' == name) or callable(super(Settings, self).__getattribute__(name)):
