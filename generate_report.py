@@ -170,7 +170,11 @@ def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
     print(f'Fetching yfinance data for {symbol}')
     # download extra data, just to be sure, that the requred date will appear on yf dataframe
     start_date = input_data.loc[input_data.index[0], 'date'] - datetime.timedelta(days=7)
-    yfdata = historical_data.get(symbol=symbol, start_date=start_date, settings=settings)
+    try:
+        yfdata = historical_data.get(symbol=symbol, start_date=start_date, settings=settings)
+    except ValueError:
+        report.warn(f'Data for {symbol} was not found')
+        return data
     if 'info' in data.columns:
         yfdata.drop('info', axis=1, inplace=True)
 
