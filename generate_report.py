@@ -4,6 +4,7 @@ import _html as html
 from _settings import Settings
 import _report as report
 import _historical_data as historical_data
+import _dataset as dataset
 
 import os
 import yaml
@@ -41,7 +42,7 @@ colors_dark = dict(
 def currency_str(value: float) -> str:
     if np.isnan(value) or np.isinf(value):
         return '?'
-    precision = 4 
+    precision = 4
     if abs(value) >= 0.50:
         precision = 2
     elif abs(value) >= 0.050:
@@ -80,8 +81,6 @@ def currency_tick_prefix() -> str:
             settings.locale).currency_formats['standard'].pattern.startswith('¤\xa0'):
             return f'{currency_symbol()} '  # add space after the symbol
         return f'{currency_symbol()}'
-    else:
-        return None
 
 def currency_tick_suffix() -> str:
     if babel.numbers.Locale.parse(
@@ -90,8 +89,6 @@ def currency_tick_suffix() -> str:
             settings.locale).currency_formats['standard'].pattern.endswith('\xa0¤'):
             return f' {currency_symbol()}'  # add space before the symbol
         return f'{currency_symbol()}'
-    else:
-        return None
 
 def percentage_tick_suffix() -> str:
     string = percentage_str(777)  # checking generated string of random percentage
@@ -155,7 +152,7 @@ def calculate_frequency(dates: pd.Series) -> str:
     frequency = None
     if len(dates) >= 4:  # calculate frequency from three dates before the last
         frequency = pd.infer_freq(dates.iloc[-4:-1])
-    if (frequency == None) and (len(dates) >= 2):
+    if (frequency is None) and (len(dates) >= 2):
         period = dates.iloc[-1] - dates.iloc[-2]
         if period < datetime.timedelta(hours=2):
             frequency = 'H'  # hourly
@@ -913,8 +910,72 @@ def append_asset_data_tabs(document: html.Document):
     
     document.append(html.TabContainer(tabs))
 
+class Main():
+    def __init__(self):
+        self.settings = Settings()
+        self.dataset = dataset.Dataset()
+
+    def run(self):
+        # making warnings not show source, since it's irrelevant in this case
+        warnings.formatwarning = lambda msg, *args, **kwargs: f'{msg}\n'
+        pd.set_option('display.max_rows', None)  # makes pandas print all dataframe rows
+        
+        self._parse_arguments()
+        self._read_settings()
+        self._read_asset_data()
+
+    def _parse_arguments(self):
+        default_input_dir = f'{os.path.dirname(os.path.realpath(__file__))}{os.path.sep}input_data'
+
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--input_dir', '-i', type=str, default=default_input_dir,
+            help='Directory, containing input files')
+        for s in self.settings:  # all settings are possible arguments
+            parser.add_argument(f'--{s}', type=type(getattr(self.settings, s)),
+                help=self.settings.get_description(s), choices=self.settings.get_allowed(s))
+        self.arguments = parser.parse_args()
+        for s in self.settings:
+            if (getattr(self.arguments, s) != None):
+                setattr(self.settings, s, getattr(self.arguments, s))
+
+    def _read_settings(self):
+        settings_found = 'no'
+        for entry in os.scandir(self.arguments.input_dir):
+            if entry.is_file() and entry.path.endswith(('.yaml', '.yml')):
+                with open(entry, 'r') as entry_file:
+                    input = yaml.safe_load(entry_file)
+                # check if there are general settings in file
+                if ('data' not in input) and (any([s in input for s in self.settings])):
+                    for s in input:
+                        setattr(self.settings, s, input[s])
+                    if settings_found == 'yes':
+                        report.warn('Multiple settings files detected, expect trouble')
+                        settings_found = 'warned'  # three states, so warning would only pop once
+                    elif settings_found == 'no':
+                        settings_found = 'yes'
+
+    def _read_asset_data(self):
+        for entry in os.scandir(self.arguments.input_dir):
+            if entry.is_file() and entry.path.endswith(('.yaml', '.yml')):
+                with open(entry, 'r') as entry_file:
+                    datadict = yaml.safe_load(entry_file)
+                # check that there are no general settings in file
+                if 'data' in datadict:
+                    datadict['filename'] = entry.name
+                    if 'name' not in datadict:
+                        datadict['name'] = os.path.splitext(entry.name)[0]  # remove extension
+                    try:
+                        self.dataset.append(datadict)
+                    except ValueError as error:
+                        report.warn(error)
+        print(self.dataset.attributes)
+
 if __name__ == '__main__':
     # making warnings not show source, since it's irrelevant in this case
+    main = Main()
+    main.run()
+    exit()
+
     warnings.formatwarning = lambda msg, *args, **kwargs: f'{msg}\n'
 
     settings = Settings()
@@ -936,8 +997,8 @@ if __name__ == '__main__':
     settings_found = 'no'
     for entry in os.scandir(arguments.input_dir):
         if entry.is_file() and (entry.path.endswith('.yaml') or entry.path.endswith('.yml')):
-            with open( entry, 'r' ) as read_file:
-                input = yaml.load( read_file, Loader=yaml.BaseLoader )
+            with open(entry, 'r') as read_file:
+                input = yaml.load(read_file, Loader=yaml.BaseLoader)
             # check if there are general settings in file
             if any([s in input for s in settings]):
                 for s in input:
@@ -951,8 +1012,8 @@ if __name__ == '__main__':
     assets = pd.DataFrame()
     for entry in os.scandir(arguments.input_dir):
         if entry.is_file() and (entry.path.endswith('.yaml') or entry.path.endswith('.yml')):
-            with open( entry, 'r' ) as read_file:
-                input = yaml.load( read_file, Loader=yaml.BaseLoader )
+            with open(entry, 'r') as read_file:
+                input = yaml.load(read_file, Loader=yaml.BaseLoader)
             # check that there are no general settings in file
             if not any([s in input for s in settings]):
                 try:

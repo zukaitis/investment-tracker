@@ -1,10 +1,10 @@
-import _report as report
-
 import babel
 import yfinance as yf
 import pandas as pd
 import inspect
 import pytz
+
+import _report as report
 
 class _Setting:
     def __init__(self, default, description: str, allowed: list = None):
@@ -25,7 +25,8 @@ class _Setting:
 
     def is_value_allowed(self, value) -> bool:
         try:
-            if False == self._is_allowed(value):
+            # some of the checks throw exceptions instead of returning False
+            if not self._is_allowed(value):
                 raise ValueError
         except:
             return False
@@ -38,7 +39,7 @@ class _Setting:
 
 class _Currency(_Setting):
     def _is_allowed(self, value) -> bool:
-        yf.Ticker(f'{value}=X').info
+        _ = yf.Ticker(f'{value}=X').info
         return True
 
 class _Locale(_Setting):
@@ -91,22 +92,22 @@ class Settings:
                 self.__dict__[name].value = value
             except ValueError:
                 message = f'Unrecognized {name.replace("_", " ")}: "{value}".'
-                if None != self.__dict__[name].allowed:
+                if self.__dict__[name].allowed is not None:
                     message += f' Allowed values: {self.__dict__[name].allowed}'
                 report.warn(message)
 
     def __getattribute__(self, name):
-        if ('__dict__' == name) or callable(super(Settings, self).__getattribute__(name)):
-            return super(Settings, self).__getattribute__(name)  # call from __iter__()
-        return super(Settings, self).__getattribute__(name).value
+        if ('__dict__' == name) or callable(super().__getattribute__(name)):
+            return super().__getattribute__(name)  # call from __iter__()
+        return super().__getattribute__(name).value
 
     def __iter__(self):
-        variables = [d for d in dir(Settings)
-            if not (d.startswith('_') or callable(getattr(Settings, d)))]
+        variables = [
+            d for d in dir(Settings) if not (d.startswith('_') or callable(getattr(Settings, d)))]
         return iter(variables)
 
     def get_description(self, name: str):
-        return super(Settings, self).__getattribute__(name).description
+        return super().__getattribute__(name).description
 
     def get_allowed(self, name: str):
-        return super(Settings, self).__getattribute__(name).allowed
+        return super().__getattribute__(name).allowed

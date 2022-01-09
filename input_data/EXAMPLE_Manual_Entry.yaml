@@ -14,7 +14,7 @@ info: >
   say, that I could achieve the same effect by copying Lorem Ipsum, or whatever it's called, but
   where's the fun in that? If you're still reading this nonsense, I would advise you to rethink
   your life choices, and maybe start reading a book or even some dumb magazine, you would get much
-  more from that, rather than this text. One more think I would like to check, if tooltips showing
+  more from that, rather than this text. One more thing I would like to check, if tooltips showing
   the full text are implemented by default, or will I have to do that myself. That's it.
 data:
   - { date: 2020-01, investment: +200, value: 199.10 }
