@@ -1,6 +1,10 @@
-import pandas as pd
+import _report as report
+
 import enum
 import dataclasses
+import typing
+import pandas as pd
+
 
 class Column(enum.Enum):
     AMOUNT = enum.auto()
@@ -66,6 +70,12 @@ class Dataset:
             Attribute.FILENAME: 'filename'
         }
 
+        for a in expected_attributes.values():
+            if (a in filedict) and (not isinstance(filedict[a], str)):
+                report.warn(f'Attribute "{a}" in a file {filedict["filename"]} is of wrong type. '
+                    'Attribute type should be string')
+                filedict.pop(a)
+
         identifier = '>'.join([
             filedict[a] for a in ['name', 'symbol', 'account', 'group'] if a in filedict])
         new_entry = pd.DataFrame(
@@ -79,7 +89,7 @@ class Dataset:
                 f'{self.attributes.at[identifier, Attribute.FILENAME]} and '
                 f'{filedict["filename"]}. Data from latter file is ignored') from error
 
-    def _append_historical_data(self, data: dict, id: str):
+    def _append_historical_data(self, data: typing.Union[list, dict], id: str):
         expected_columns = {
             Column.INVESTMENT: 'investment',
             Column.RETURN: 'return',
@@ -89,7 +99,18 @@ class Dataset:
             Column.VALUE: 'value'
         }
 
-        new_entry = pd.DataFrame(
-            {key:date[val] for key, val in expected_columns.items() if val in date},
-            index=[id, data['date']])
+        if (not isinstance(data, (list, dict))) and (data is not None):
+            raise ValueError('Wrong type of data in '
+                f'{self.attributes.at[id, Attribute.FILENAME]}. '
+                'It should be either a list or a dictionary')
+
+        new_entry = pd.DataFrame(data)
+
+        if 'date' not in new_entry.columns:
+            raise ValueError('Not a single date found in '
+                f'{self.attributes.at[id, Attribute.FILENAME]}. Ignoring this file')
+
+        # new_entry = pd.DataFrame(
+        #     {key:data[val] for key, val in expected_columns.items() if val in data},
+        #     index=[id, data['date']])
         print(new_entry)

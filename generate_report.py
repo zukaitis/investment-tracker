@@ -962,7 +962,7 @@ class Main():
                 # check that there are no general settings in file
                 if 'data' in datadict:
                     datadict['filename'] = entry.name
-                    if 'name' not in datadict:
+                    if ('name' not in datadict) or (not isinstance(datadict['name'], str)):
                         datadict['name'] = os.path.splitext(entry.name)[0]  # remove extension
                     try:
                         self.dataset.append(datadict)
