@@ -53,7 +53,7 @@ class Dataset:
 
         last_id = self.attributes.index[-1]
         try:
-            self._append_historical_data(filedict['data'], id=last_id)
+            self._append_historical_data(filedict['data'], identifier=last_id)
         except Exception as error:
             self.attributes.drop(last_id, inplace=True)  # remove attribute if something went wrong
             raise ValueError(error) from error
@@ -89,28 +89,49 @@ class Dataset:
                 f'{self.attributes.at[identifier, Attribute.FILENAME]} and '
                 f'{filedict["filename"]}. Data from latter file is ignored') from error
 
-    def _append_historical_data(self, data: typing.Union[list, dict], id: str):
-        expected_columns = {
-            Column.INVESTMENT: 'investment',
-            Column.RETURN: 'return',
-            Column.RETURN_TAX: 'return_tax',
-            Column.PRICE: 'price',
-            Column.AMOUNT: 'amount',
-            Column.VALUE: 'value'
-        }
-
+    def _append_historical_data(self, data: typing.Union[list, dict], identifier: str):
         if (not isinstance(data, (list, dict))) and (data is not None):
             raise ValueError('Wrong type of data in '
-                f'{self.attributes.at[id, Attribute.FILENAME]}. '
+                f'{self.attributes.at[identifier, Attribute.FILENAME]}. '
                 'It should be either a list or a dictionary')
 
         new_entry = pd.DataFrame(data)
+        new_entry['id'] = identifier
 
         if 'date' not in new_entry.columns:
             raise ValueError('Not a single date found in '
-                f'{self.attributes.at[id, Attribute.FILENAME]}. Ignoring this file')
+                f'{self.attributes.at[identifier, Attribute.FILENAME]}. Ignoring this file')
 
-        # new_entry = pd.DataFrame(
-        #     {key:data[val] for key, val in expected_columns.items() if val in data},
-        #     index=[id, data['date']])
+        new_entry = self._convert_historical_data(new_entry)
+
         print(new_entry)
+
+    def _convert_historical_data(self, data: pd.DataFrame) -> pd.DataFrame:
+        @dataclasses.dataclass()
+        class InputColumn:
+            name: str
+            min_value: float = None
+            max_value: float = None
+
+        expected_columns = {
+            Column.INVESTMENT: InputColumn('investment'),
+            Column.RETURN: InputColumn('return', min_value=0),
+            Column.RETURN_TAX: InputColumn('return_tax', min_value=0, max_value=1.0),
+            Column.PRICE: InputColumn('price', min_value=0),
+            Column.AMOUNT: InputColumn('amount', min_value=0),
+            Column.VALUE: InputColumn('value', min_value=0)
+        }
+
+        data.rename(
+            columns={val.name:key for key, val in expected_columns.items() if val.name in data},
+            inplace=True)
+
+        data['date'] = pd.to_datetime(data['date'], errors='ignore')
+        available_columns = [c for c in expected_columns if c in data.columns]
+        data[available_columns] = data[available_columns].astype(float, errors='ignore')
+
+        for index, row in data.iterrows():
+            if not isinstance(row['date'], datetime.datetime):
+                
+
+        return data
