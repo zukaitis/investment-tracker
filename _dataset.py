@@ -4,6 +4,7 @@ import enum
 import dataclasses
 import typing
 import pandas as pd
+import datetime
 
 
 class Column(enum.Enum):
@@ -57,6 +58,7 @@ class Dataset:
         except Exception as error:
             self.attributes.drop(last_id, inplace=True)  # remove attribute if something went wrong
             raise ValueError(error) from error
+        
 
         # self.update_attributes()
 
@@ -72,8 +74,7 @@ class Dataset:
 
         for a in expected_attributes.values():
             if (a in filedict) and (not isinstance(filedict[a], str)):
-                report.warn(f'Attribute "{a}" in a file {filedict["filename"]} is of wrong type. '
-                    'Attribute type should be string')
+                report.warn(f'Attribute "{a}" is of wrong type. Attribute type should be string')
                 filedict.pop(a)
 
         identifier = '>'.join([
@@ -91,47 +92,66 @@ class Dataset:
 
     def _append_historical_data(self, data: typing.Union[list, dict], identifier: str):
         if (not isinstance(data, (list, dict))) and (data is not None):
-            raise ValueError('Wrong type of data in '
-                f'{self.attributes.at[identifier, Attribute.FILENAME]}. '
-                'It should be either a list or a dictionary')
+            raise ValueError('Data should be either a list or a dictionary')
 
         new_entry = pd.DataFrame(data)
         new_entry['id'] = identifier
 
         if 'date' not in new_entry.columns:
-            raise ValueError('Not a single date found in '
-                f'{self.attributes.at[identifier, Attribute.FILENAME]}. Ignoring this file')
+            raise ValueError('Not a single date found in file')
 
         new_entry = self._convert_historical_data(new_entry)
 
         print(new_entry)
 
-    def _convert_historical_data(self, data: pd.DataFrame) -> pd.DataFrame:
+    def _convert_historical_data(self, input_data: pd.DataFrame) -> pd.DataFrame:
         @dataclasses.dataclass()
         class InputColumn:
             name: str
-            min_value: float = None
+            non_negative: bool = False
             max_value: float = None
 
         expected_columns = {
             Column.INVESTMENT: InputColumn('investment'),
-            Column.RETURN: InputColumn('return', min_value=0),
-            Column.RETURN_TAX: InputColumn('return_tax', min_value=0, max_value=1.0),
-            Column.PRICE: InputColumn('price', min_value=0),
-            Column.AMOUNT: InputColumn('amount', min_value=0),
-            Column.VALUE: InputColumn('value', min_value=0)
+            Column.RETURN: InputColumn('return', non_negative=True),
+            Column.RETURN_TAX: InputColumn('return_tax', non_negative=True, max_value=1.0),
+            Column.PRICE: InputColumn('price', non_negative=True),
+            Column.AMOUNT: InputColumn('amount', non_negative=True),
+            Column.VALUE: InputColumn('value', non_negative=True)
         }
 
+        data = input_data.copy()
         data.rename(
             columns={val.name:key for key, val in expected_columns.items() if val.name in data},
             inplace=True)
+        if 'comment' in data.columns:
+            data.rename(columns={'comment': Column.COMMENT}, inplace=True)
 
-        data['date'] = pd.to_datetime(data['date'], errors='ignore')
+        data = data[data['date'].notnull()]  # remove rows without a date
+        data['date'] = pd.to_datetime(data['date'], errors='coerce')
+        if any(data['date'].isnull()):
+            report.warn('Unrecognized dates found in data')
+            data = data[data['date'].notnull()]  # remove rows where date was not converted
+
         available_columns = [c for c in expected_columns if c in data.columns]
-        data[available_columns] = data[available_columns].astype(float, errors='ignore')
-
-        for index, row in data.iterrows():
-            if not isinstance(row['date'], datetime.datetime):
-                
+        original_data = data.copy()
+        data[available_columns] = data[available_columns].apply(pd.to_numeric, errors='coerce')
+        for col in available_columns:
+            unrecognized = data[col].isnull() & original_data[col].notnull()
+            if any(unrecognized):
+                report.warn(f'Unrecognized data found in {expected_columns[col].name} column')
+                data = data[~unrecognized]
+            if expected_columns[col].non_negative:
+                negative = (data[col] < 0)
+                if any(negative):
+                    report.warn(f'Negative values found in {expected_columns[col].name} column')
+                    data = data[~negative]
+            if expected_columns[col].max_value is not None:
+                too_high = (data[col] > expected_columns[col].max_value)
+                if any(too_high):
+                    report.warn(f'Too high values found in {expected_columns[col].name} column. '
+                        'Values in this column should not exceed '
+                        f'{expected_columns[col].max_value}')
+                    data = data[~too_high]
 
         return data

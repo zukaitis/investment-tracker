@@ -9,3 +9,7 @@ autofill_price_mark: Random1~  # existing setting with non-existant value
 # non-existant settings don't crash the script
 non-existant-setting: Whatever
 __getattr__: "In case you try being smart"
+dict_as_setting: {should: "not", work: "or crash"}
+value_change_span:
+  - existing: settings of wrong type
+  - should: not work either

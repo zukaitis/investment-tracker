@@ -91,7 +91,7 @@ class Settings:
             try:
                 self.__dict__[name].value = value
             except ValueError:
-                message = f'Unrecognized {name.replace("_", " ")}: "{value}".'
+                message = f'Unrecognized {name.replace("_", " ")}: "{value}"'
                 if self.__dict__[name].allowed is not None:
                     message += f' Allowed values: {self.__dict__[name].allowed}'
                 report.warn(message)

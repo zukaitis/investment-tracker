@@ -946,6 +946,7 @@ class Main():
                     input = yaml.safe_load(entry_file)
                 # check if there are general settings in file
                 if ('data' not in input) and (any([s in input for s in self.settings])):
+                    report.report(f'Reading setting file {entry.name}')
                     for s in input:
                         setattr(self.settings, s, input[s])
                     if settings_found == 'yes':
@@ -961,6 +962,7 @@ class Main():
                     datadict = yaml.safe_load(entry_file)
                 # check that there are no general settings in file
                 if 'data' in datadict:
+                    report.report(f'Reading asset data file {entry.name}')
                     datadict['filename'] = entry.name
                     if ('name' not in datadict) or (not isinstance(datadict['name'], str)):
                         datadict['name'] = os.path.splitext(entry.name)[0]  # remove extension
@@ -1085,7 +1087,7 @@ if __name__ == '__main__':
     print('Generating report')
     report.append(f'<h1>{title}</h1>')
     report.append(f'<h3>Data from {date_str(earliest_date)} to {date_str(latest_date)}</h3>')
-    report.append(html.Button(image_initial='calendar_day.svg', 
+    report.append(html.Button(image_initial='calendar_day.svg',
         image_alternate='calendar_month.svg', identifier='value_change_button'))
     append_overall_data_tabs(report)
     append_asset_data_tabs(report)
