@@ -1,53 +1,25 @@
-import _report as report
-
+import datetime
 import enum
 import dataclasses
-import typing
 import pandas as pd
-import datetime
 
-
-class Column(enum.Enum):
-    AMOUNT = enum.auto()
-    PRICE = enum.auto()
-    VALUE = enum.auto()
-    INVESTMENT = enum.auto()
-    PERIOD = enum.auto()
-    NET_INVESTMENT = enum.auto()
-    MAXIMUM_NET_INVESTMENT = enum.auto()
-    RETURN = enum.auto()
-    NET_RETURN = enum.auto()
-    RETURN_TAX = enum.auto()
-    NET_SALE_PROFIT = enum.auto()
-    NET_PROFIT = enum.auto()
-    RELATIVE_NET_PROFIT = enum.auto()
-    COMMENT = enum.auto()
+import _dataset_identification as id
+import _report as report
 
 _interpolation_method = {
-    Column.AMOUNT: 'pad',
-    Column.VALUE: 'linear',
-    Column.INVESTMENT: 'pad',
-    Column.RETURN: None,
-    Column.RETURN_TAX: 'pad',
-    Column.PRICE: 'pad'
+    id.Column.AMOUNT: 'pad',
+    id.Column.VALUE: 'linear',
+    id.Column.INVESTMENT: 'pad',
+    id.Column.RETURN: None,
+    id.Column.RETURN_TAX: 'pad',
+    id.Column.PRICE: 'pad'
 }
-
-class Attribute(enum.Enum):
-    NAME = enum.auto()
-    SYMBOL = enum.auto()
-    GROUP = enum.auto()
-    ACCOUNT = enum.auto()
-    COLOR = enum.auto()
-    INFO = enum.auto()
-    FILENAME = enum.auto()
-    CURRENT_VALUE = enum.auto()
-    IS_RELEVANT = enum.auto()
 
 class Dataset:
     def __init__(self):
-        self.attributes = pd.DataFrame(columns=Attribute)
-        index = pd.MultiIndex([[]]*2, [[]]*2, names=['id', 'date'])
-        self.historical_data = pd.DataFrame(columns=Column, index=index)
+        self.attributes = pd.DataFrame(columns=list(id.Attribute))
+        index = pd.MultiIndex([[]]*2, [[]]*2, names=list(id.Index))
+        self.historical_data = pd.DataFrame(columns=list(id.Column), index=index)
 
     def append(self, filedict: dict):
         self._append_asset_attributes(filedict)
@@ -64,12 +36,12 @@ class Dataset:
 
     def _append_asset_attributes(self, filedict: dict):
         expected_attributes = {
-            Attribute.NAME: 'name',
-            Attribute.SYMBOL: 'symbol',
-            Attribute.GROUP: 'group',
-            Attribute.ACCOUNT: 'account',
-            Attribute.INFO: 'info',
-            Attribute.FILENAME: 'filename'
+            id.Attribute.NAME: 'name',
+            id.Attribute.SYMBOL: 'symbol',
+            id.Attribute.GROUP: 'group',
+            id.Attribute.ACCOUNT: 'account',
+            id.Attribute.INFO: 'info',
+            id.Attribute.FILENAME: 'filename'
         }
 
         for a in expected_attributes.values():
@@ -87,20 +59,22 @@ class Dataset:
             self.attributes = self.attributes.append(new_entry, verify_integrity=True)
         except ValueError as error:
             raise ValueError('Identical asset attributes found in files '
-                f'{self.attributes.at[identifier, Attribute.FILENAME]} and '
+                f'{self.attributes.at[identifier, id.Attribute.FILENAME]} and '
                 f'{filedict["filename"]}. Data from latter file is ignored') from error
 
-    def _append_historical_data(self, data: typing.Union[list, dict], identifier: str):
-        if (not isinstance(data, (list, dict))) and (data is not None):
-            raise ValueError('Data should be either a list or a dictionary')
+    def _append_historical_data(self, data: list, identifier: str):
+        if not isinstance(data, list):
+            raise ValueError('Data should be structured as a list')
 
         new_entry = pd.DataFrame(data)
-        new_entry['id'] = identifier
+        new_entry[id.Index.ID] = identifier
 
         if 'date' not in new_entry.columns:
             raise ValueError('Not a single date found in file')
 
         new_entry = self._convert_historical_data(new_entry)
+        if len(new_entry) == 0:
+            raise ValueError('No data left in file after filtering')
 
         print(new_entry)
 
@@ -112,27 +86,29 @@ class Dataset:
             max_value: float = None
 
         expected_columns = {
-            Column.INVESTMENT: InputColumn('investment'),
-            Column.RETURN: InputColumn('return', non_negative=True),
-            Column.RETURN_TAX: InputColumn('return_tax', non_negative=True, max_value=1.0),
-            Column.PRICE: InputColumn('price', non_negative=True),
-            Column.AMOUNT: InputColumn('amount', non_negative=True),
-            Column.VALUE: InputColumn('value', non_negative=True)
+            id.Column.INVESTMENT: InputColumn('investment'),
+            id.Column.RETURN: InputColumn('return', non_negative=True),
+            id.Column.RETURN_TAX: InputColumn('return_tax', non_negative=True, max_value=1.0),
+            id.Column.PRICE: InputColumn('price', non_negative=True),
+            id.Column.AMOUNT: InputColumn('amount', non_negative=True),
+            id.Column.VALUE: InputColumn('value', non_negative=True)
         }
 
         data = input_data.copy()
         data.rename(
             columns={val.name:key for key, val in expected_columns.items() if val.name in data},
             inplace=True)
+        data.rename(columns={'date': id.Index.DATE}, inplace=True)
         if 'comment' in data.columns:
-            data.rename(columns={'comment': Column.COMMENT}, inplace=True)
+            data.rename(columns={'comment': id.Column.COMMENT}, inplace=True)
 
-        data = data[data['date'].notnull()]  # remove rows without a date
-        data['date'] = pd.to_datetime(data['date'], errors='coerce')
-        if any(data['date'].isnull()):
+        data = data[data[id.Index.DATE].notnull()]  # remove rows without a date
+        data[id.Index.DATE] = pd.to_datetime(data[id.Index.DATE], errors='coerce')
+        if any(data[id.Index.DATE].isnull()):
             report.warn('Unrecognized dates found in data')
-            data = data[data['date'].notnull()]  # remove rows where date was not converted
+            data = data[data[id.Index.DATE].notnull()]  # remove rows where date was not converted
 
+        # filter out unrecognized, negative, and too high values
         available_columns = [c for c in expected_columns if c in data.columns]
         original_data = data.copy()
         data[available_columns] = data[available_columns].apply(pd.to_numeric, errors='coerce')
@@ -141,11 +117,13 @@ class Dataset:
             if any(unrecognized):
                 report.warn(f'Unrecognized data found in {expected_columns[col].name} column')
                 data = data[~unrecognized]
+                original_data = original_data[~unrecognized]
             if expected_columns[col].non_negative:
                 negative = (data[col] < 0)
                 if any(negative):
                     report.warn(f'Negative values found in {expected_columns[col].name} column')
                     data = data[~negative]
+                    original_data = original_data[~negative]
             if expected_columns[col].max_value is not None:
                 too_high = (data[col] > expected_columns[col].max_value)
                 if any(too_high):
@@ -153,5 +131,7 @@ class Dataset:
                         'Values in this column should not exceed '
                         f'{expected_columns[col].max_value}')
                     data = data[~too_high]
+                    original_data = original_data[~too_high]
 
+        data = data.set_index(list(id.Index)).sort_index()
         return data

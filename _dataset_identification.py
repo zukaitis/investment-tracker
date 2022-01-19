@@ -1,0 +1,32 @@
+import enum
+
+class Index(enum.Enum):
+    ID = enum.auto()
+    DATE = enum.auto()
+
+class Column(enum.Enum):
+    AMOUNT = enum.auto()
+    PRICE = enum.auto()
+    VALUE = enum.auto()
+    INVESTMENT = enum.auto()
+    PERIOD = enum.auto()
+    NET_INVESTMENT = enum.auto()
+    MAXIMUM_NET_INVESTMENT = enum.auto()
+    RETURN = enum.auto()
+    NET_RETURN = enum.auto()
+    RETURN_TAX = enum.auto()
+    NET_SALE_PROFIT = enum.auto()
+    NET_PROFIT = enum.auto()
+    RELATIVE_NET_PROFIT = enum.auto()
+    COMMENT = enum.auto()
+
+class Attribute(enum.Enum):
+    NAME = enum.auto()
+    SYMBOL = enum.auto()
+    GROUP = enum.auto()
+    ACCOUNT = enum.auto()
+    COLOR = enum.auto()
+    INFO = enum.auto()
+    FILENAME = enum.auto()
+    CURRENT_VALUE = enum.auto()
+    IS_RELEVANT = enum.auto()
