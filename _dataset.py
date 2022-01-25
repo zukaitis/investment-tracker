@@ -5,6 +5,8 @@ import pandas as pd
 
 import _dataset_identification as id
 import _report as report
+import _settings as settings
+import _yfinance_wrapper as yfinance_wrapper
 
 _interpolation_method = {
     id.Column.AMOUNT: 'pad',
@@ -16,7 +18,8 @@ _interpolation_method = {
 }
 
 class Dataset:
-    def __init__(self):
+    def __init__(self, settings:settings.Settings):
+        self._yfinance = yfinance_wrapper.YfinanceWrapper(settings)
         self.attributes = pd.DataFrame(columns=list(id.Attribute))
         index = pd.MultiIndex([[]]*2, [[]]*2, names=list(id.Index))
         self.historical_data = pd.DataFrame(columns=list(id.Column), index=index)
@@ -30,7 +33,6 @@ class Dataset:
         except Exception as error:
             self.attributes.drop(last_id, inplace=True)  # remove attribute if something went wrong
             raise ValueError(error) from error
-        
 
         # self.update_attributes()
 
@@ -59,8 +61,9 @@ class Dataset:
             self.attributes = self.attributes.append(new_entry, verify_integrity=True)
         except ValueError as error:
             raise ValueError('Identical asset attributes found in files '
-                f'{self.attributes.at[identifier, id.Attribute.FILENAME]} and '
-                f'{filedict["filename"]}. Data from latter file is ignored') from error
+                f'{report.cf.italic(self.attributes.at[identifier, id.Attribute.FILENAME])} and '
+                f'{report.cf.italic(filedict["filename"])}. Data from latter file is ignored'
+                ) from error
 
     def _append_historical_data(self, data: list, identifier: str):
         if not isinstance(data, list):
@@ -76,7 +79,7 @@ class Dataset:
         if len(new_entry) == 0:
             raise ValueError('No data left in file after filtering')
 
-        print(new_entry)
+        #print(new_entry)
 
     def _convert_historical_data(self, input_data: pd.DataFrame) -> pd.DataFrame:
         @dataclasses.dataclass()
@@ -113,25 +116,27 @@ class Dataset:
         original_data = data.copy()
         data[available_columns] = data[available_columns].apply(pd.to_numeric, errors='coerce')
         for col in available_columns:
+            column_name_italic = report.cf.italic(expected_columns[col].name)
             unrecognized = data[col].isnull() & original_data[col].notnull()
             if any(unrecognized):
-                report.warn(f'Unrecognized data found in {expected_columns[col].name} column')
+                report.warn(f'Unrecognized data found in {column_name_italic} column')
                 data = data[~unrecognized]
                 original_data = original_data[~unrecognized]
             if expected_columns[col].non_negative:
                 negative = (data[col] < 0)
                 if any(negative):
-                    report.warn(f'Negative values found in {expected_columns[col].name} column')
+                    report.warn(f'Negative values found in {column_name_italic} column')
                     data = data[~negative]
                     original_data = original_data[~negative]
             if expected_columns[col].max_value is not None:
                 too_high = (data[col] > expected_columns[col].max_value)
                 if any(too_high):
-                    report.warn(f'Too high values found in {expected_columns[col].name} column. '
+                    report.warn(f'Too high values found in {column_name_italic} column. '
                         'Values in this column should not exceed '
                         f'{expected_columns[col].max_value}')
                     data = data[~too_high]
                     original_data = original_data[~too_high]
 
         data = data.set_index(list(id.Index)).sort_index()
+        data = data.reindex(list(id.Column), axis=1)  # add missing columns
         return data

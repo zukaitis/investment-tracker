@@ -7,11 +7,11 @@ import _report as report
 import _settings as settings
 import _dataset_identification as id
 
-class HistoricalData:
+class YfinanceWrapper:
     def __init__(self, settings: settings.Settings):
         self.settings = settings
 
-    def get(self, symbol: str, start_date: datetime.datetime) -> pd.DataFrame:
+    def get_historical_data(self, symbol: str, start_date: datetime.datetime) -> pd.DataFrame:
         ticker = yf.Ticker(symbol)
         with supress.supressed():
             fine = ticker.history(period='5d', interval='60m').astype(float)
@@ -39,14 +39,15 @@ class HistoricalData:
                 f'Ticker currency info is missing. '
                 f'Assuming, that ticker currency matches input currency ({self.settings.currency})')
 
-        data = data.reset_index().rename(columns={'index':'date', 'Date':'date',
-            self.settings.autofill_price_mark:'price', 'Dividends': 'dividends'})
+        data = data.reset_index().rename(columns={'index':id.Index.DATE, #'Date':id.Index.DATE,
+            self.settings.autofill_price_mark:id.Column.PRICE, 'Dividends': id.Column.RETURN})
 
+        return data[[id.Index.DATE, id.Column.PRICE, id.Column.RETURN]]
+
+    def get_info(symbol: str) -> str:
+        ticker = yf.Ticker(symbol)
         if 'description' in ticker.info:
-            data['info'] = ticker.info['description']
-        elif 'longBusinessSummary' in ticker.info:
-            data['info'] = ticker.info['longBusinessSummary']
-
-        data = data[['date', 'price', 'info', 'dividends']]
-
-        return data
+            return ticker.info['description']
+        if 'longBusinessSummary' in ticker.info:
+            return ticker.info['longBusinessSummary']
+        return ''

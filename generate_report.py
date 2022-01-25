@@ -3,7 +3,7 @@
 import _html as html
 from _settings import Settings
 import _report as report
-import _historical_data as historical_data
+import _yfinance_wrapper as historical_data
 import _dataset as dataset
 
 import os
@@ -913,7 +913,7 @@ def append_asset_data_tabs(document: html.Document):
 class Main():
     def __init__(self):
         self.settings = Settings()
-        self.dataset = dataset.Dataset()
+        self.dataset = dataset.Dataset(self.settings)
 
     def run(self):
         # making warnings not show source, since it's irrelevant in this case
@@ -969,7 +969,7 @@ class Main():
                     try:
                         self.dataset.append(datadict)
                     except ValueError as error:
-                        report.warn(error)
+                        report.error(error)
         print(self.dataset.attributes)
 
 if __name__ == '__main__':
