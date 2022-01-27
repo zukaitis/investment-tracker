@@ -19,7 +19,6 @@ from dataclasses import dataclass
 import dataclasses
 import babel.numbers
 import babel.dates
-import warnings
 
 cyan = px.colors.qualitative.Plotly[5]
 
@@ -916,10 +915,8 @@ class Main():
         self.dataset = dataset.Dataset(self.settings)
 
     def run(self):
-        # making warnings not show source, since it's irrelevant in this case
-        warnings.formatwarning = lambda msg, *args, **kwargs: f'{msg}\n'
-        pd.set_option('display.max_rows', None)  # makes pandas print all dataframe rows
-        
+        #pd.set_option('display.max_rows', None)  # makes pandas print all dataframe rows
+
         self._parse_arguments()
         self._read_settings()
         self._read_asset_data()
@@ -935,7 +932,7 @@ class Main():
                 help=self.settings.get_description(s), choices=self.settings.get_allowed(s))
         self.arguments = parser.parse_args()
         for s in self.settings:
-            if (getattr(self.arguments, s) != None):
+            if getattr(self.arguments, s) != None:
                 setattr(self.settings, s, getattr(self.arguments, s))
 
     def _read_settings(self):
@@ -978,8 +975,6 @@ if __name__ == '__main__':
     main.run()
     exit()
 
-    warnings.formatwarning = lambda msg, *args, **kwargs: f'{msg}\n'
-
     settings = Settings()
     default_input_dir = f'{os.path.dirname(os.path.realpath(__file__))}{os.path.sep}input_data'
 
@@ -994,7 +989,7 @@ if __name__ == '__main__':
         if (getattr(arguments, s) != None):
             setattr(settings, s, getattr(arguments, s))
 
-    pd.set_option('display.max_rows', None)  # makes pandas print all dataframe rows
+    #pd.set_option('display.max_rows', None)  # makes pandas print all dataframe rows
 
     settings_found = 'no'
     for entry in os.scandir(arguments.input_dir):

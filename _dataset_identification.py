@@ -11,7 +11,7 @@ class Column(enum.Enum):
     INVESTMENT = enum.auto()
     PERIOD = enum.auto()
     NET_INVESTMENT = enum.auto()
-    MAXIMUM_NET_INVESTMENT = enum.auto()
+    NET_INVESTMENT_MAX = enum.auto()
     RETURN = enum.auto()
     NET_RETURN = enum.auto()
     RETURN_TAX = enum.auto()
@@ -30,3 +30,4 @@ class Attribute(enum.Enum):
     FILENAME = enum.auto()
     CURRENT_VALUE = enum.auto()
     IS_RELEVANT = enum.auto()
+    YFINANCE_FETCH_SUCCESSFUL = enum.auto()

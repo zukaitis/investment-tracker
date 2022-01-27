@@ -33,13 +33,14 @@ class _Setting:
         return True
 
     def _is_allowed(self, value) -> bool:
-        if (None != self.allowed) and (value not in self.allowed):
+        if (self.allowed is not None) and (value not in self.allowed):
             return False
         return True
 
 class _Currency(_Setting):
     def _is_allowed(self, value) -> bool:
-        _ = yf.Ticker(f'{value}=X').info
+        if len(yf.Ticker(f'{value}=X').history()) == 0:
+            return False
         return True
 
 class _Locale(_Setting):
@@ -54,6 +55,11 @@ class _Period(_Setting):
 class _Timezone(_Setting):
     def _is_allowed(self, value) -> bool:
         return (value in pytz.all_timezones)
+
+class _Float(_Setting):
+    def _is_allowed(self, value) -> bool:
+        float(value)
+        return True
 
 class _Name(_Setting):
     @_Setting.value.setter

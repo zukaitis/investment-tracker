@@ -14,7 +14,7 @@ class YfinanceWrapper:
     def get_historical_data(self, symbol: str, start_date: datetime.datetime) -> pd.DataFrame:
         ticker = yf.Ticker(symbol)
         with supress.supressed():
-            fine = ticker.history(period='5d', interval='60m').astype(float)
+            fine = ticker.history(period='5d', interval='60m')
         coarse_end_date = None
         if not fine.empty:
             fine.index = fine.index.tz_convert(self.settings.timezone).tz_localize(None)
