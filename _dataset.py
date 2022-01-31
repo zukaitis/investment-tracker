@@ -4,6 +4,7 @@ import dataclasses
 import numpy as np
 import pandas as pd
 import plotly.express as px
+import typing
 
 import _dataset_identification as id
 import _report as report
@@ -23,58 +24,89 @@ class Dataset:
     def __init__(self, settings:settings.Settings):
         self._settings = settings
         self._yfinance = yfinance_wrapper.YfinanceWrapper(self._settings)
-        self.attributes = pd.DataFrame(columns=list(id.Attribute))
+        self._attributes = pd.DataFrame(columns=list(id.Attribute))
+        self._attribute_data_calculated = False
         self.historical_data = {}
         self.latest_date = None
         self.earliest_date = None
 
+    @property
+    def attributes(self) -> pd.DataFrame:
+        if not self._attribute_data_calculated:
+            self._calculate_attribute_data()
+            self._attribute_data_calculated = True
+        return self._attributes
+
     def append(self, filedict: dict):
         self._append_asset_attributes(filedict)
 
-        last_id = self.attributes.index[-1]
+        last_id = self._attributes.index[-1]
         try:
             self._append_historical_data(filedict['data'], identifier=last_id)
         except Exception as error:
-            self.attributes.drop(last_id, inplace=True)  # remove attribute if something went wrong
+            # remove attribute if something went wrong
+            self._attributes.drop(last_id, inplace=True)
             raise ValueError(error) from error
 
-        self._recalculate_attribute_data()
+    def sum(self, assets: typing.Union[list, pd.DataFrame]) -> pd.DataFrame:
+        if isinstance(assets, pd.DataFrame):
+            assets = list(assets.index)
+        if not isinstance(assets, list):
+            raise TypeError('Parameter should be either a list or DataFrame')
 
-    def _recalculate_attribute_data(self):
+        sum = pd.DataFrame()
+        for a in assets:
+            sum.add(self.historical_data[a])
+        sum[[id.Column.PRICE, id.Column.AMOUNT, id.Column.COMMENT]] = np.nan
+        return self._interpolate_historical_data(sum)
+
+    def _calculate_attribute_data(self):
         self.latest_date = max([max(a.index) for _, a in self.historical_data.items()])
         self.earliest_date = min([min(a.index) for _, a in self.historical_data.items()])
 
-        for identifier in self.attributes.index:
-            self.attributes.at[identifier, id.Attribute.CURRENT_VALUE] = (
+        for identifier in self._attributes.index:
+            self._attributes.at[identifier, id.Attribute.CURRENT_VALUE] = (
                 self.historical_data[identifier][id.Column.VALUE].iloc[-1])
 
             if any(self.historical_data[identifier][id.Column.VALUE] > 0):
-                self.attributes.at[identifier, id.Attribute.IS_RELEVANT] = (
-                    self.attributes.at[identifier, id.Attribute.CURRENT_VALUE] != 0)
+                self._attributes.at[identifier, id.Attribute.IS_RELEVANT] = (
+                    self._attributes.at[identifier, id.Attribute.CURRENT_VALUE] != 0)
             else:
                 # taxes are considered irrelevant,
                 # if they weren't updated for a certain amount of time
-                self.attributes.at[identifier, id.Attribute.IS_RELEVANT] = (
+                self._attributes.at[identifier, id.Attribute.IS_RELEVANT] = (
                     max(self.historical_data[identifier].index) < (self.latest_date
                         - pd.tseries.frequencies.to_offset(self._settings.relevance_period)))
 
+        self._attributes[id.Attribute.GROUP].fillna('Ungrouped', inplace=True)
         self._reassign_colors()
 
     def _reassign_colors(self):
-        self.attributes.sort_values(by=[id.Attribute.CURRENT_VALUE, id.Attribute.IS_RELEVANT],
+        self._attributes.sort_values(by=[id.Attribute.CURRENT_VALUE, id.Attribute.IS_RELEVANT],
             inplace=True, ascending=False)
 
-        group_list = self.attributes[id.Attribute.GROUP].unique()
-        if np.nan in group_list:
-            group_list.remove(np.nan)
-        print(group_list)
-        for rrr, group in self.attributes.groupby(id.Attribute.GROUP):
-            boundary_colors = [px.colors.qualitative.Set1[index], px.colors.qualitative.Pastel1[index]]
-            c = px.colors.n_colors(boundary_colors[0], boundary_colors[1], max(len(group.index), 4), colortype='rgb')
-            c = c[:len(group.index)]
-            group[id.Attribute.COLOR] = c
-            index += 1
+        bright_colors = px.colors.qualitative.Set1
+        pastel_colors = px.colors.qualitative.Pastel1
+        groups = self._attributes.groupby(id.Attribute.GROUP).agg(
+            {id.Attribute.CURRENT_VALUE:'sum'})
+        groups.sort_values(by=id.Attribute.CURRENT_VALUE, ascending=False, inplace=True)
+        if len(groups) > len(bright_colors):
+            report.error('Input data contains too many different groups. '
+                'Because of that, group colors will be reused')
 
+        color_index = 0
+        for group in groups.index:
+            asset_count = len(self._attributes[self._attributes[id.Attribute.GROUP] == group])
+            bright_color = bright_colors[color_index]
+            pastel_color = pastel_colors[color_index]
+            colors = px.colors.n_colors(
+                bright_color, pastel_color, max(asset_count, 4), colortype='rgb')
+            colors = colors[:asset_count]
+            self._attributes.loc[
+                self._attributes[id.Attribute.GROUP] == group, id.Attribute.COLOR] = colors
+            color_index += 1
+            if color_index == len(bright_colors):
+                color_index = 0
 
     def _append_asset_attributes(self, filedict: dict):
         expected_attributes = {
@@ -98,10 +130,10 @@ class Dataset:
             index=[identifier])
         try:
             # check for duplicate IDs is enabled with verify_integrity
-            self.attributes = self.attributes.append(new_entry, verify_integrity=True)
+            self._attributes = self._attributes.append(new_entry, verify_integrity=True)
         except ValueError as error:
-            raise ValueError('Identical asset attributes found in files '
-                f'{report.cf.italic(self.attributes.at[identifier, id.Attribute.FILENAME])} and '
+            raise ValueError('Identical asset _attributes found in files '
+                f'{report.cf.italic(self._attributes.at[identifier, id.Attribute.FILENAME])} and '
                 f'{report.cf.italic(filedict["filename"])}. Data from latter file is ignored'
                 ) from error
 
@@ -118,21 +150,20 @@ class Dataset:
         if len(new_entry) == 0:
             raise ValueError('No data left in file after filtering')
 
-        symbol = self.attributes.at[identifier, id.Attribute.SYMBOL]
+        symbol = self._attributes.at[identifier, id.Attribute.SYMBOL]
         if (symbol is not np.nan
                 and id.Column.VALUE not in new_entry.columns
                 and id.Column.PRICE not in new_entry.columns):
             report.report(f'Fetching yfinance data for {report.cf.italic(symbol)}')
             yfdata = self._yfinance.get_historical_data(symbol,
                 min(new_entry[id.Index.DATE]))
-            self.attributes.at[identifier, id.Attribute.YFINANCE_FETCH_SUCCESSFUL] = True
+            self._attributes.at[identifier, id.Attribute.YFINANCE_FETCH_SUCCESSFUL] = True
             new_entry = pd.merge(new_entry, yfdata, on=id.Index.DATE, how='outer')
 
         new_entry = new_entry.set_index(id.Index.DATE).sort_index()
         new_entry = new_entry.reindex(list(id.Column), axis=1)
 
         new_entry = self._interpolate_historical_data(new_entry)
-        
         self.historical_data.update({identifier:new_entry})
 
     def _convert_historical_data(self, input_data: pd.DataFrame) -> pd.DataFrame:
@@ -212,7 +243,7 @@ class Dataset:
 
         data.loc[pd.isna(data[id.Column.VALUE]), id.Column.VALUE] = (
             data[id.Column.AMOUNT] * data[id.Column.PRICE])
-        
+
         data = self._fill_period_data(data)
 
         data[id.Column.NET_SALE_PROFIT] = np.where(data[id.Column.NET_INVESTMENT] < 0,

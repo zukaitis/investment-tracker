@@ -5,6 +5,7 @@ from _settings import Settings
 import _report as report
 import _yfinance_wrapper as historical_data
 import _dataset as dataset
+import _dataset_identification as id
 
 import os
 import yaml
@@ -921,8 +922,10 @@ class Main():
         self._read_settings()
         self._read_asset_data()
 
+        print(self.dataset.sum(self.dataset.attributes))
+
     def _parse_arguments(self):
-        default_input_dir = f'{os.path.dirname(os.path.realpath(__file__))}{os.path.sep}input_data'
+        default_input_dir = f'{os.path.dirname(os.path.realpath(__file__))}{os.path.sep}less_data'
 
         parser = argparse.ArgumentParser()
         parser.add_argument('--input_dir', '-i', type=str, default=default_input_dir,
@@ -947,8 +950,8 @@ class Main():
                     for s in input:
                         setattr(self.settings, s, input[s])
                     if settings_found == 'yes':
-                        report.warn('Multiple settings files detected, expect trouble')
-                        settings_found = 'warned'  # three states, so warning would only pop once
+                        report.error('Multiple settings files detected, expect trouble')
+                        settings_found = 'warned'  # three states, so error would only pop once
                     elif settings_found == 'no':
                         settings_found = 'yes'
 
@@ -967,7 +970,6 @@ class Main():
                         self.dataset.append(datadict)
                     except ValueError as error:
                         report.error(error)
-        print(self.dataset.attributes)
 
 if __name__ == '__main__':
     # making warnings not show source, since it's irrelevant in this case
