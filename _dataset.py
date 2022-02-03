@@ -54,11 +54,19 @@ class Dataset:
         if not isinstance(assets, list):
             raise TypeError('Parameter should be either a list or DataFrame')
 
-        sum = pd.DataFrame()
+        all_dates = pd.Index([])
         for a in assets:
-            sum.add(self.historical_data[a])
-        sum[[id.Column.PRICE, id.Column.AMOUNT, id.Column.COMMENT]] = np.nan
-        return self._interpolate_historical_data(sum)
+            all_dates = all_dates.append(self.historical_data[a].index).unique().sort_values()
+
+        result = pd.DataFrame(columns=id.Column, index=all_dates)
+        result[[id.Column.VALUE, id.Column.INVESTMENT, id.Column.RETURN]] = 0
+        for a in assets:
+            historical = self.historical_data[a].reindex(all_dates)
+            historical[[id.Column.PRICE, id.Column.AMOUNT, id.Column.COMMENT]] = np.nan
+            historical = self._interpolate_historical_data(historical)
+            result = result.add(historical)
+
+        return self._interpolate_historical_data(result)
 
     def _calculate_attribute_data(self):
         self.latest_date = max([max(a.index) for _, a in self.historical_data.items()])
@@ -243,6 +251,8 @@ class Dataset:
 
         data.loc[pd.isna(data[id.Column.VALUE]), id.Column.VALUE] = (
             data[id.Column.AMOUNT] * data[id.Column.PRICE])
+        data[id.Column.VALUE] = data[id.Column.VALUE].interpolate(method='linear')
+        data[id.Column.RETURN] = data[id.Column.RETURN] * (1 - data[id.Column.RETURN_TAX])
 
         data = self._fill_period_data(data)
 
@@ -251,8 +261,11 @@ class Dataset:
         data.loc[data[id.Column.NET_INVESTMENT] < 0, id.Column.NET_INVESTMENT] = 0
         data[id.Column.NET_PROFIT] = (data[id.Column.VALUE] - data[id.Column.NET_INVESTMENT]
             + data[id.Column.NET_RETURN] + data[id.Column.NET_SALE_PROFIT])
-        data[id.Column.RELATIVE_NET_PROFIT] = (
-            data[id.Column.NET_PROFIT] / data[id.Column.NET_INVESTMENT_MAX])
+
+        non_zero = (data[id.Column.NET_INVESTMENT_MAX] != 0)
+        data.loc[non_zero, id.Column.RELATIVE_NET_PROFIT] = (
+            data.loc[non_zero, id.Column.NET_PROFIT]
+            / data.loc[non_zero, id.Column.NET_INVESTMENT_MAX])
 
         return data
 
