@@ -1,0 +1,6 @@
+---
+name: Your Grandma's appartment
+# Scenario: you got an appartment from your Grandma, you renovate it, and put it for rent
+group: Real estate
+data:
+ # - { date: "Jan, 2019", investment: +5000 }  # new furniture, repairs, etc

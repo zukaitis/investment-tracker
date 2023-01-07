@@ -5,12 +5,12 @@ from _settings import Settings
 import _report as report
 import _yfinance_wrapper as historical_data
 import _dataset as dataset
-import _dataset_identification as id
 
 import os
 import yaml
 import argparse
 import datetime
+import enum
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -922,7 +922,7 @@ class Main():
         self._read_settings()
         self._read_asset_data()
 
-        print(self.dataset.sum(self.dataset.attributes))
+        print(self.dataset.get_historical_data_sum(self.dataset.attributes))
 
     def _parse_arguments(self):
         default_input_dir = f'{os.path.dirname(os.path.realpath(__file__))}{os.path.sep}less_data'
@@ -939,7 +939,12 @@ class Main():
                 setattr(self.settings, s, getattr(self.arguments, s))
 
     def _read_settings(self):
-        settings_found = 'no'
+        class SettingsFound(enum.Enum):
+            NO = enum.auto()
+            YES = enum.auto()
+            WARNED = enum.auto()
+
+        settings_found = SettingsFound.NO
         for entry in os.scandir(self.arguments.input_dir):
             if entry.is_file() and entry.path.endswith(('.yaml', '.yml')):
                 with open(entry, 'r') as entry_file:
@@ -949,11 +954,11 @@ class Main():
                     report.report(f'Reading setting file {entry.name}')
                     for s in input:
                         setattr(self.settings, s, input[s])
-                    if settings_found == 'yes':
-                        report.error('Multiple settings files detected, expect trouble')
-                        settings_found = 'warned'  # three states, so error would only pop once
-                    elif settings_found == 'no':
-                        settings_found = 'yes'
+                    if settings_found == SettingsFound.YES:
+                        reppiort.warn('Multiple settings files detected, expect trouble')
+                        settings_found = SettingsFound.WARNED  # three states, so error would only pop once
+                    elif settings_found == SettingsFound.NO:
+                        settings_found = SettingsFound.YES
 
     def _read_asset_data(self):
         for entry in os.scandir(self.arguments.input_dir):
@@ -972,7 +977,6 @@ class Main():
                         report.error(error)
 
 if __name__ == '__main__':
-    # making warnings not show source, since it's irrelevant in this case
     main = Main()
     main.run()
     exit()

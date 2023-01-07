@@ -1,0 +1,15 @@
+---
+name: Dumb Data
+symbol: ":DD"
+data:
+  - { date: "Dec 28, 2051", investment: +50, amount: 1234 }
+  - { date: "parachute", investment: +50, amount: 1234 }
+  - { date: "2021-01-01", investment: +50, amount: -1234 }
+  - { date: "2020-01-02", return: -12.34 }
+  - { date: "2020-01-02", dumb_column: -1234 }
+  - { date: "2020-03-02", value: -123 }
+  - { date: "100-03-02", price: 20 }
+  - { date: "2010-03-02", price: -20 }
+  - { date: "2021-07-08", return_tax: {dict: "instead of str"}}
+  - { date: "2020-09-08", return_tax: 20}
+  - { date: "2020-09-08", return_tax: 0.7, comment: "duplicate date, should be removed"}

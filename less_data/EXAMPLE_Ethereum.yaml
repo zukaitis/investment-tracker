@@ -1,0 +1,10 @@
+---
+name: Ethereum
+symbol: ETH-USD
+group: Cryptocurrency
+account:
+  - account is of unexpected type here
+  - should throw a warning and be ignored
+data:
+  - { date: 2017-12, investment: +45, amount: 0.2}
+  - { date: 2017-11, investment: +30, amount: 0.1}

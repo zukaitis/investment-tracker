@@ -11,15 +11,6 @@ import _report as report
 import _settings as settings
 import _yfinance_wrapper as yfinance_wrapper
 
-_interpolation_method = {
-    id.Column.AMOUNT: 'pad',
-    id.Column.VALUE: 'linear',
-    id.Column.INVESTMENT: 'pad',
-    id.Column.RETURN: None,
-    id.Column.RETURN_TAX: 'pad',
-    id.Column.PRICE: 'pad'
-}
-
 class Dataset:
     def __init__(self, settings:settings.Settings):
         self._settings = settings
@@ -48,7 +39,7 @@ class Dataset:
             self._attributes.drop(last_id, inplace=True)
             raise ValueError(error) from error
 
-    def sum(self, assets: typing.Union[list, pd.DataFrame]) -> pd.DataFrame:
+    def get_historical_data_sum(self, assets: typing.Union[list, pd.DataFrame]) -> pd.DataFrame:
         if isinstance(assets, pd.DataFrame):
             assets = list(assets.index)
         if not isinstance(assets, list):
@@ -67,6 +58,11 @@ class Dataset:
             result = result.add(historical)
 
         return self._interpolate_historical_data(result)
+
+    def get_monthly_data(self, column: id.Column) -> pd.DataFrame:
+        print("yo")
+
+        
 
     def _calculate_attribute_data(self):
         self.latest_date = max([max(a.index) for _, a in self.historical_data.items()])
@@ -138,7 +134,7 @@ class Dataset:
             index=[identifier])
         try:
             # check for duplicate IDs is enabled with verify_integrity
-            self._attributes = self._attributes.append(new_entry, verify_integrity=True)
+            self._attributes = pd.concat([self._attributes, new_entry], verify_integrity=True)
         except ValueError as error:
             raise ValueError('Identical asset _attributes found in files '
                 f'{report.cf.italic(self._attributes.at[identifier, id.Attribute.FILENAME])} and '
@@ -273,7 +269,7 @@ class Dataset:
         data = input_data.copy()
 
         start_of_period = ((data[id.Column.VALUE] != 0) & (data[id.Column.VALUE].shift(1) == 0))
-        
+
         data[id.Column.PERIOD] = np.where(start_of_period, 1, np.nan)
         data[id.Column.PERIOD] = data[id.Column.PERIOD].cumsum().interpolate(method='pad')
         data[id.Column.PERIOD] = data[id.Column.PERIOD].fillna(0) + 1

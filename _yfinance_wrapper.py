@@ -5,7 +5,7 @@ import supress
 
 import _report as report
 import _settings as settings
-import _dataset_identification as id
+import _dataset as dataset
 
 class YfinanceWrapper:
     def __init__(self, settings: settings.Settings):
@@ -39,10 +39,10 @@ class YfinanceWrapper:
                 f'Ticker currency info is missing. '
                 f'Assuming, that ticker currency matches input currency ({self.settings.currency})')
 
-        data = data.reset_index().rename(columns={'index':id.Index.DATE, #'Date':id.Index.DATE,
-            self.settings.autofill_price_mark:id.Column.PRICE, 'Dividends': id.Column.RETURN})
+        data = data.reset_index().rename(columns={'index':dataset.id.Index.DATE, #'Date':dataset.id.Index.DATE,
+            self.settings.autofill_price_mark:dataset.id.Column.PRICE, 'Dividends': dataset.id.Column.RETURN})
 
-        return data[[id.Index.DATE, id.Column.PRICE, id.Column.RETURN]]
+        return data[[dataset.id.Index.DATE, dataset.id.Column.PRICE, dataset.id.Column.RETURN]]
 
     def get_info(symbol: str) -> str:
         ticker = yf.Ticker(symbol)
