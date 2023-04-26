@@ -5,6 +5,7 @@ currency: USD
 locale: en_US
 theme: auto
 autofill_price_mark: Random1~  # existing setting with non-existant value
+timezone: Europe/Warsaw
 
 # non-existant settings don't crash the script
 non-existant-setting: Whatever

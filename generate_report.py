@@ -174,14 +174,14 @@ def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
     fine = ticker.history(period='5d', interval='60m').astype(float)
     coarse_end_date = None
     if len(fine) > 0:
-        fine.index = fine.index.tz_convert(settings.timezone).tz_localize(None)
+        # fine.index = fine.index.tz_convert(settings.timezone) #.tz_localize(None)
         coarse_end_date = fine.index[0].date()
     coarse = ticker.history(start=start_date, end=coarse_end_date, interval='1d')
     yfdata = pd.concat([coarse, fine])
-    if 'currency' in ticker.info:
-        if ticker.info['currency'] != settings.currency:
+    if 'currency' in ticker.fast_info:
+        if ticker.fast_info['currency'] != settings.currency:
             # convert currency, if it differs from the one selected in settings
-            currency_ticker = yf.Ticker(f"{ticker.info['currency']}{settings.currency}=X")
+            currency_ticker = yf.Ticker(f"{ticker.fast_info['currency']}{settings.currency}=X")
             currency_rate = currency_ticker.history(start=start_date, interval='1d')
             yfdata[settings.autofill_price_mark] *= currency_rate[settings.autofill_price_mark]
             yfdata['Dividends'] *= currency_rate[settings.autofill_price_mark]
@@ -189,10 +189,18 @@ def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
         print_warning('Ticker currency info is missing. '
             f'Assuming, that ticker currency matches input currency ({settings.currency})')
 
+    #yfdata.index = yfdata.index.tz_convert(settings.timezone)
     yfdata = yfdata.reset_index().rename(columns={'index':'date', 'Date':'date',
         settings.autofill_price_mark:'price'})
 
-    data = pd.merge(data, yfdata, on='date', how='outer').sort_values(by=['date'])
+    # data = pd.merge(data, yfdata, on='date', how='outer').sort_values(by=['date'])
+    data['date'] = data['date'].tz_convert(settings.timezone)
+    print(data)
+    print(yfdata)
+    data = pd.concat([data, yfdata], keys='date')
+    print(data)
+    data = data.sort_values(by=['date'])
+    print(data)
 
     if 'return_tax' not in data.columns:
         data['return_tax'] = 0.0
@@ -210,10 +218,10 @@ def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
         data['return'] = data['amount'] * data['Dividends'].fillna(0.0) * (1 - data['return_tax'])
 
     if 'info' not in data.columns:
-        if 'description' in ticker.info:
-            data['info'] = ticker.info['description']
-        elif 'longBusinessSummary' in ticker.info:
-            data['info'] = ticker.info['longBusinessSummary']
+        if 'description' in ticker.fast_info:
+            data['info'] = ticker.fast_info['description']
+        elif 'longBusinessSummary' in ticker.fast_info:
+            data['info'] = ticker.fast_info['longBusinessSummary']
 
     return data
 
@@ -951,7 +959,7 @@ if __name__ == '__main__':
         if (getattr(arguments, s) != None):
             setattr(settings, s, getattr(arguments, s))
 
-    pd.set_option('display.max_rows', None)  # makes pandas print all dataframe rows
+    # pd.set_option('display.max_rows', None)  # makes pandas print all dataframe rows
 
     settings_found = 'no'
     for entry in os.scandir(arguments.input_dir):
