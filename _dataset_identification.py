@@ -1,8 +1,10 @@
 import enum
 
+
 class Index(enum.Enum):
     ID = enum.auto()
     DATE = enum.auto()
+
 
 class Column(enum.Enum):
     AMOUNT = enum.auto()
@@ -19,6 +21,7 @@ class Column(enum.Enum):
     NET_PROFIT = enum.auto()
     RELATIVE_NET_PROFIT = enum.auto()
     COMMENT = enum.auto()
+
 
 class Attribute(enum.Enum):
     NAME = enum.auto()
