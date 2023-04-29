@@ -15,29 +15,29 @@ class Dataset:
     def __init__(self, settings:settings.Settings):
         self._settings = settings
         self._yfinance = yfinance_wrapper.YfinanceWrapper(self._settings)
-        self._attributes = pd.DataFrame(columns=list(id.Attribute))
+        self._assets = pd.DataFrame(columns=list(id.Attribute))
         self._attribute_data_calculated = False
         self.historical_data = {}
         self.latest_date = None
         self.earliest_date = None
 
     @property
-    def attributes(self) -> pd.DataFrame:
+    def assets(self) -> pd.DataFrame:
         if not self._attribute_data_calculated:
             self._calculate_attribute_data()
             self._attribute_data_calculated = True
-        return self._attributes
+        return self._assets
 
     def append(self, filedict: dict):
-        self._append_asset_attributes(filedict)
+        self._append_asset_assets(filedict)
 
-        last_id = self._attributes.index[-1]
-        try:
-            self._append_historical_data(filedict['data'], identifier=last_id)
-        except Exception as error:
-            # remove attribute if something went wrong
-            self._attributes.drop(last_id, inplace=True)
-            raise ValueError(error) from error
+        last_id = self._assets.index[-1]
+        # try:
+        self._append_historical_data(filedict['data'], identifier=last_id)
+        # except Exception as error:
+        #     # remove attribute if something went wrong
+        #     self._assets.drop(last_id, inplace=True)
+        #     raise ValueError(error) from error
 
     def get_historical_data_sum(self, assets: typing.Union[list, pd.DataFrame]) -> pd.DataFrame:
         if isinstance(assets, pd.DataFrame):
@@ -68,30 +68,30 @@ class Dataset:
         self.latest_date = max([max(a.index) for _, a in self.historical_data.items()])
         self.earliest_date = min([min(a.index) for _, a in self.historical_data.items()])
 
-        for identifier in self._attributes.index:
-            self._attributes.at[identifier, id.Attribute.CURRENT_VALUE] = (
+        for identifier in self._assets.index:
+            self._assets.at[identifier, id.Attribute.CURRENT_VALUE] = (
                 self.historical_data[identifier][id.Column.VALUE].iloc[-1])
 
             if any(self.historical_data[identifier][id.Column.VALUE] > 0):
-                self._attributes.at[identifier, id.Attribute.IS_RELEVANT] = (
-                    self._attributes.at[identifier, id.Attribute.CURRENT_VALUE] != 0)
+                self._assets.at[identifier, id.Attribute.IS_RELEVANT] = (
+                    self._assets.at[identifier, id.Attribute.CURRENT_VALUE] != 0)
             else:
                 # taxes are considered irrelevant,
                 # if they weren't updated for a certain amount of time
-                self._attributes.at[identifier, id.Attribute.IS_RELEVANT] = (
+                self._assets.at[identifier, id.Attribute.IS_RELEVANT] = (
                     max(self.historical_data[identifier].index) < (self.latest_date
                         - pd.tseries.frequencies.to_offset(self._settings.relevance_period)))
 
-        self._attributes[id.Attribute.GROUP].fillna('Ungrouped', inplace=True)
+        self._assets[id.Attribute.GROUP].fillna('Ungrouped', inplace=True)
         self._reassign_colors()
 
     def _reassign_colors(self):
-        self._attributes.sort_values(by=[id.Attribute.CURRENT_VALUE, id.Attribute.IS_RELEVANT],
+        self._assets.sort_values(by=[id.Attribute.CURRENT_VALUE, id.Attribute.IS_RELEVANT],
             inplace=True, ascending=False)
 
         bright_colors = px.colors.qualitative.Set1
         pastel_colors = px.colors.qualitative.Pastel1
-        groups = self._attributes.groupby(id.Attribute.GROUP).agg(
+        groups = self._assets.groupby(id.Attribute.GROUP).agg(
             {id.Attribute.CURRENT_VALUE:'sum'})
         groups.sort_values(by=id.Attribute.CURRENT_VALUE, ascending=False, inplace=True)
         if len(groups) > len(bright_colors):
@@ -100,20 +100,20 @@ class Dataset:
 
         color_index = 0
         for group in groups.index:
-            asset_count = len(self._attributes[self._attributes[id.Attribute.GROUP] == group])
+            asset_count = len(self._assets[self._assets[id.Attribute.GROUP] == group])
             bright_color = bright_colors[color_index]
             pastel_color = pastel_colors[color_index]
             colors = px.colors.n_colors(
                 bright_color, pastel_color, max(asset_count, 4), colortype='rgb')
             colors = colors[:asset_count]
-            self._attributes.loc[
-                self._attributes[id.Attribute.GROUP] == group, id.Attribute.COLOR] = colors
+            self._assets.loc[
+                self._assets[id.Attribute.GROUP] == group, id.Attribute.COLOR] = colors
             color_index += 1
             if color_index == len(bright_colors):
                 color_index = 0
 
-    def _append_asset_attributes(self, filedict: dict):
-        expected_attributes = {
+    def _append_asset_assets(self, filedict: dict):
+        expected_assets = {
             id.Attribute.NAME: 'name',
             id.Attribute.SYMBOL: 'symbol',
             id.Attribute.GROUP: 'group',
@@ -122,7 +122,7 @@ class Dataset:
             id.Attribute.FILENAME: 'filename'
         }
 
-        for a in expected_attributes.values():
+        for a in expected_assets.values():
             if (a in filedict) and (not isinstance(filedict[a], str)):
                 report.warn(f'Attribute "{a}" is of wrong type. Attribute type should be string')
                 filedict.pop(a)
@@ -130,15 +130,15 @@ class Dataset:
         identifier = '>'.join([
             filedict[a] for a in ['name', 'symbol', 'account', 'group'] if a in filedict])
         new_entry = pd.DataFrame(
-            {key:filedict[val] for key, val in expected_attributes.items() if val in filedict},
+            {key:filedict[val] for key, val in expected_assets.items() if val in filedict},
             index=[identifier])
         try:
             # check for duplicate IDs is enabled with verify_integrity
-            self._attributes = pd.concat([self._attributes, new_entry], verify_integrity=True)
+            self._assets = pd.concat([self._assets, new_entry], verify_integrity=True)
         except ValueError as error:
-            raise ValueError('Identical asset _attributes found in files '
-                f'{report.cf.italic(self._attributes.at[identifier, id.Attribute.FILENAME])} and '
-                f'{report.cf.italic(filedict["filename"])}. Data from latter file is ignored'
+            raise ValueError('Identical asset _assets found in files '
+                f'{report.italic(self._assets.at[identifier, id.Attribute.FILENAME])} and '
+                f'{report.italic(filedict["filename"])}. Data from latter file is ignored'
                 ) from error
 
     def _append_historical_data(self, data: list, identifier: str):
@@ -154,21 +154,20 @@ class Dataset:
         if len(new_entry) == 0:
             raise ValueError('No data left in file after filtering')
 
-        symbol = self._attributes.at[identifier, id.Attribute.SYMBOL]
+        symbol = self._assets.at[identifier, id.Attribute.SYMBOL]
         if (symbol is not np.nan
                 and id.Column.VALUE not in new_entry.columns
                 and id.Column.PRICE not in new_entry.columns):
-            report.report(f'Fetching yfinance data for {report.cf.italic(symbol)}')
-            yfdata = self._yfinance.get_historical_data(symbol,
-                min(new_entry[id.Index.DATE]))
-            self._attributes.at[identifier, id.Attribute.YFINANCE_FETCH_SUCCESSFUL] = True
-            new_entry = pd.merge(new_entry, yfdata, on=id.Index.DATE, how='outer')
-
-        new_entry = new_entry.set_index(id.Index.DATE).sort_index()
-        new_entry = new_entry.reindex(list(id.Column), axis=1)
+            report.report(f'Fetching yfinance data for {report.italic(symbol)}')
+            yfdata = self._yfinance.get_historical_data(symbol, min(new_entry.index))
+            self._assets.at[identifier, id.Attribute.YFINANCE_FETCH_SUCCESSFUL] = True
+            new_entry = pd.concat([new_entry, yfdata], axis=1)
 
         new_entry = self._interpolate_historical_data(new_entry)
         self.historical_data.update({identifier:new_entry})
+
+    def _contains_non_zero_values(self, column: pd.Series) -> bool:
+        return any((column.values != 0) & (pd.notna(column.values)))
 
     def _convert_historical_data(self, input_data: pd.DataFrame) -> pd.DataFrame:
         @dataclasses.dataclass()
@@ -208,7 +207,7 @@ class Dataset:
         original_data = data.copy()
         data[available_columns] = data[available_columns].apply(pd.to_numeric, errors='coerce')
         for col in available_columns:
-            column_name_italic = report.cf.italic(expected_columns[col].name)
+            column_name_italic = report.italic(expected_columns[col].name)
             unrecognized = data[col].isnull() & original_data[col].notnull()
             if any(unrecognized):
                 report.warn(f'Unrecognized data found in {column_name_italic} column')
@@ -229,6 +228,7 @@ class Dataset:
                     data = data[~too_high]
                     original_data = original_data[~too_high]
 
+        data = data.set_index(id.Index.DATE).sort_index()
         return data
 
     def _interpolate_historical_data(self, input_data: pd.DataFrame) -> pd.DataFrame:
@@ -241,13 +241,20 @@ class Dataset:
 
         data = input_data.copy()
         for col, method in interpolated_columns.items():
+            if (col not in data.columns):
+                data[col] = np.nan
             if method is not None:
                 data[col] = data[col].interpolate(method=method)
             data[col] = data[col].fillna(0.0)
 
-        data.loc[pd.isna(data[id.Column.VALUE]), id.Column.VALUE] = (
-            data[id.Column.AMOUNT] * data[id.Column.PRICE])
+        if (id.Column.VALUE not in data.columns):
+            data[id.Column.VALUE] = np.nan
+        if (self._contains_non_zero_values(data[id.Column.AMOUNT]) and self._contains_non_zero_values(data[id.Column.PRICE])):
+            data.loc[pd.isna(data[id.Column.VALUE]), id.Column.VALUE] = (
+                data[id.Column.AMOUNT] * data[id.Column.PRICE])
         data[id.Column.VALUE] = data[id.Column.VALUE].interpolate(method='linear')
+        data[id.Column.VALUE] = data[id.Column.VALUE].fillna(0.0)
+
         data[id.Column.RETURN] = data[id.Column.RETURN] * (1 - data[id.Column.RETURN_TAX])
 
         data = self._fill_period_data(data)

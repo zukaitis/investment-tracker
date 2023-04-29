@@ -5,6 +5,7 @@ from _settings import Settings
 import _report as report
 import _yfinance_wrapper as historical_data
 import _dataset as dataset
+import _dataset_identification as id
 
 import os
 import yaml
@@ -164,25 +165,47 @@ def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
     data = input_data.copy()
 
     symbol = input_data.loc[input_data.index[0], 'symbol']
+    ticker = yf.Ticker(symbol)
     print(f'Fetching yfinance data for {symbol}')
     # download extra data, just to be sure, that the requred date will appear on yf dataframe
     start_date = input_data.loc[input_data.index[0], 'date'] - datetime.timedelta(days=7)
-    try:
-        yfdata = historical_data.get(symbol=symbol, start_date=start_date, settings=settings)
-    except ValueError:
-        report.warn(f'Data for {symbol} was not found')
-        return data
-    if 'info' in data.columns:
-        yfdata.drop('info', axis=1, inplace=True)
+    fine = ticker.history(period='5d', interval='60m').astype(float)
+    coarse_end_date = None
+    if len(fine) > 0:
+        # fine.index = fine.index.tz_convert(settings.timezone) #.tz_localize(None)
+        coarse_end_date = fine.index[0].date()
+    coarse = ticker.history(start=start_date, end=coarse_end_date, interval='1d')
+    yfdata = pd.concat([coarse, fine])
+    if 'currency' in ticker.fast_info:
+        if ticker.fast_info['currency'] != settings.currency:
+            # convert currency, if it differs from the one selected in settings
+            currency_ticker = yf.Ticker(f"{ticker.fast_info['currency']}{settings.currency}=X")
+            currency_rate = currency_ticker.history(start=start_date, interval='1d')
+            yfdata[settings.autofill_price_mark] *= currency_rate[settings.autofill_price_mark]
+            yfdata['Dividends'] *= currency_rate[settings.autofill_price_mark]
+    else:
+        print_warning('Ticker currency info is missing. '
+            f'Assuming, that ticker currency matches input currency ({settings.currency})')
 
-    data = pd.merge(data, yfdata, on='date', how='outer').sort_values(by=['date'])
+    #yfdata.index = yfdata.index.tz_convert(settings.timezone)
+    yfdata = yfdata.reset_index().rename(columns={'index':'date', 'Date':'date',
+        settings.autofill_price_mark:'price'})
+
+    # data = pd.merge(data, yfdata, on='date', how='outer').sort_values(by=['date'])
+    data['date'] = data['date'].tz_convert(settings.timezone)
+    print(data)
+    print(yfdata)
+    data = pd.concat([data, yfdata], keys='date')
+    print(data)
+    data = data.sort_values(by=['date'])
+    print(data)
 
     if 'return_tax' not in data.columns:
         data['return_tax'] = 0.0
     data['return_tax'] = pd.to_numeric(data['return_tax']).interpolate(method='pad').fillna(0.0)
 
     for p in ['name', 'symbol', 'account', 'group', 'info']: # TODO: move this part out of the method
-        if p in input_data.columns:
+        if p in data.columns:
             data[p] = input_data.loc[input_data.index[0], p]
 
     data['amount'] = pd.to_numeric(data['amount']).interpolate(method='pad').fillna(0.0)
@@ -190,7 +213,13 @@ def autofill(input_data: pd.DataFrame) -> pd.DataFrame:
     data['investment'] = pd.to_numeric(data['investment']).fillna(0.0)
     data['value'] = data['amount'] * data['price']
     if 'return' not in data.columns:
-        data['return'] = data['amount'] * data['dividends'].fillna(0.0) * (1 - data['return_tax'])
+        data['return'] = data['amount'] * data['Dividends'].fillna(0.0) * (1 - data['return_tax'])
+
+    if 'info' not in data.columns:
+        if 'description' in ticker.fast_info:
+            data['info'] = ticker.fast_info['description']
+        elif 'longBusinessSummary' in ticker.fast_info:
+            data['info'] = ticker.fast_info['longBusinessSummary']
 
     return data
 
@@ -916,13 +945,14 @@ class Main():
         self.dataset = dataset.Dataset(self.settings)
 
     def run(self):
-        #pd.set_option('display.max_rows', None)  # makes pandas print all dataframe rows
+        # pd.set_option('display.max_rows', None)  # makes pandas print all dataframe rows
 
         self._parse_arguments()
         self._read_settings()
         self._read_asset_data()
 
-        print(self.dataset.get_historical_data_sum(self.dataset.attributes))
+        print(self.dataset.assets)
+        self.dataset.get_historical_data_sum(self.dataset.assets).to_csv('out.csv')  
 
     def _parse_arguments(self):
         default_input_dir = f'{os.path.dirname(os.path.realpath(__file__))}{os.path.sep}less_data'

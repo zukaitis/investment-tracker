@@ -21,15 +21,16 @@ class YfinanceWrapper:
             coarse_end_date = fine.index[0].date()
         with supress.supressed():
             coarse = ticker.history(start=start_date, end=coarse_end_date, interval='1d')
+            coarse.index = coarse.index.tz_convert(self.settings.timezone).tz_localize(None)
         data = pd.concat([coarse, fine])
 
         if data.empty:
             raise ValueError(f'Symbol "{symbol}" not found')
 
-        if 'currency' in ticker.info:
-            if ticker.info['currency'] != self.settings.currency:
+        if 'currency' in ticker.fast_info:
+            if ticker.fast_info['currency'] != self.settings.currency:
                 # convert currency, if it differs from the one selected in settings
-                currency_ticker = yf.Ticker(f"{ticker.info['currency']}{self.settings.currency}=X")
+                currency_ticker = yf.Ticker(f"{ticker.fast_info['currency']}{self.settings.currency}=X")
                 currency_rate = currency_ticker.history(start=start_date, interval='1d')
                 data[self.settings.autofill_price_mark] *= (
                     currency_rate[self.settings.autofill_price_mark])
@@ -39,15 +40,15 @@ class YfinanceWrapper:
                 f'Ticker currency info is missing. '
                 f'Assuming, that ticker currency matches input currency ({self.settings.currency})')
 
-        data = data.reset_index().rename(columns={'index':dataset.id.Index.DATE, #'Date':dataset.id.Index.DATE,
+        data = data.rename(columns={
             self.settings.autofill_price_mark:dataset.id.Column.PRICE, 'Dividends': dataset.id.Column.RETURN})
 
-        return data[[dataset.id.Index.DATE, dataset.id.Column.PRICE, dataset.id.Column.RETURN]]
+        return data[[dataset.id.Column.PRICE, dataset.id.Column.RETURN]]
 
     def get_info(symbol: str) -> str:
         ticker = yf.Ticker(symbol)
-        if 'description' in ticker.info:
-            return ticker.info['description']
-        if 'longBusinessSummary' in ticker.info:
-            return ticker.info['longBusinessSummary']
+        if 'description' in ticker.fast_info:
+            return ticker.fast_info['description']
+        if 'longBusinessSummary' in ticker.fast_info:
+            return ticker.fast_info['longBusinessSummary']
         return ''

@@ -8,3 +8,6 @@ def error(message: str):
 
 def report(message: str):
     print(message)
+
+def italic(string: str):
+    return cf.italic(string)
