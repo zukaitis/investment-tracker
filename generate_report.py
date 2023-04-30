@@ -6,7 +6,7 @@ import os
 import yaml
 
 from source.settings import Settings
-from source import report
+from source import log
 from source import dataset
 
 
@@ -63,11 +63,11 @@ class Main:
                     input = yaml.safe_load(entry_file)
                 # check if there are general settings in file
                 if ("data" not in input) and (any([s in input for s in self.settings])):
-                    report.report(f"Reading setting file {entry.name}")
+                    log.info(f"Reading setting file {entry.name}")
                     for s in input:
                         setattr(self.settings, s, input[s])
                     if settings_found == SettingsFound.YES:
-                        report.warn("Multiple settings files detected, expect trouble")
+                        log.warning("Multiple settings files detected, expect trouble")
                         settings_found = (
                             SettingsFound.WARNED
                         )  # three states, so error would only pop once
@@ -81,7 +81,7 @@ class Main:
                     datadict = yaml.safe_load(entry_file)
                 # check that there are no general settings in file
                 if "data" in datadict:
-                    report.report(f"Reading asset data file {entry.name}")
+                    log.info(f"Reading asset data file {entry.name}")
                     datadict["filename"] = entry.name
                     if ("name" not in datadict) or (
                         not isinstance(datadict["name"], str)
@@ -92,7 +92,7 @@ class Main:
                     try:
                         self.dataset.append(datadict)
                     except ValueError as error:
-                        report.error(error)
+                        log.error(error)
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@ import yfinance as yf
 import pandas as pd
 import pytz
 
-from source import report
+from source import log
 
 
 class _Setting:
@@ -113,7 +113,7 @@ class Settings:
 
     def __setattr__(self, name, value):
         if name not in self:
-            report.warn(f'No such setting: "{name}"')
+            log.warning(f'No such setting: "{name}"')
         else:
             try:
                 self.__dict__[name].value = value
@@ -121,7 +121,7 @@ class Settings:
                 message = f'Unrecognized {name.replace("_", " ")}: "{value}"'
                 if self.__dict__[name].allowed is not None:
                     message += f" Allowed values: {self.__dict__[name].allowed}"
-                report.warn(message)
+                log.warning(message)
 
     def __getattribute__(self, name):
         if ("__dict__" == name) or callable(super().__getattribute__(name)):

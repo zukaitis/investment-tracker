@@ -3,7 +3,7 @@ import yfinance as yf
 import pandas as pd
 import supress
 
-from source import report
+from source import log
 from source import settings
 from source import dataset
 
@@ -46,7 +46,7 @@ class YfinanceWrapper:
                 ]
                 data["Dividends"] *= currency_rate[self.settings.autofill_price_mark]
         else:
-            report.warn(
+            log.warning(
                 f"Ticker currency info is missing. "
                 f"Assuming, that ticker currency matches input currency ({self.settings.currency})"
             )

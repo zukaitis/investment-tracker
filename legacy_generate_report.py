@@ -294,7 +294,7 @@ def process_data(input_data, discard_zero_values: bool = True) -> pd.DataFrame:
     if data.duplicated(subset="date").any():
         dataset_name = data.loc[data.index[0], "name"]
         duplicates = data.loc[data.duplicated(subset="date"), "date"]
-        report.warn(
+        log.warning(
             f'There are duplicate dates in "{dataset_name}" dataset:\n{duplicates}'
         )
         data.drop_duplicates(subset=["date"], inplace=True)
@@ -1475,7 +1475,7 @@ class Main:
                     input = yaml.safe_load(entry_file)
                 # check if there are general settings in file
                 if ("data" not in input) and (any([s in input for s in self.settings])):
-                    report.report(f"Reading setting file {entry.name}")
+                    log.info(f"Reading setting file {entry.name}")
                     for s in input:
                         setattr(self.settings, s, input[s])
                     if settings_found == SettingsFound.YES:
@@ -1495,7 +1495,7 @@ class Main:
                     datadict = yaml.safe_load(entry_file)
                 # check that there are no general settings in file
                 if "data" in datadict:
-                    report.report(f"Reading asset data file {entry.name}")
+                    log.info(f"Reading asset data file {entry.name}")
                     datadict["filename"] = entry.name
                     if ("name" not in datadict) or (
                         not isinstance(datadict["name"], str)
@@ -1506,7 +1506,7 @@ class Main:
                     try:
                         self.dataset.append(datadict)
                     except ValueError as error:
-                        report.error(error)
+                        log.error(error)
 
 
 if __name__ == "__main__":
@@ -1553,7 +1553,7 @@ if __name__ == "__main__":
                 for s in input:
                     setattr(settings, s, input[s])
                 if settings_found == "yes":
-                    report.warn("Multiple settings files detected, expect trouble")
+                    log.warning("Multiple settings files detected, expect trouble")
                     settings_found = (
                         "warned"  # three states, so warning would only pop once
                     )

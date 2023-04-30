@@ -8,7 +8,7 @@ import typing
 import warnings
 
 import source.dataset_identification as id
-from source import report
+from source import log
 from source import settings
 from source import yfinance_wrapper
 
@@ -31,7 +31,7 @@ class Dataset:
         return self._assets
 
     def append(self, filedict: dict):
-        self._append_asset_assets(filedict)
+        self._append_asset_attributes(filedict)
 
         last_id = self._assets.index[-1]
         # try:
@@ -86,8 +86,7 @@ class Dataset:
                     self._assets.at[identifier, id.Attribute.CURRENT_VALUE] != 0
                 )
             else:
-                # taxes are considered irrelevant,
-                # if they weren't updated for a certain amount of time
+                # Tax "assets" are considered irrelevant, if they weren't updated for a certain amount of time
                 self._assets.at[identifier, id.Attribute.IS_RELEVANT] = max(
                     self.historical_data[identifier].index
                 ) < (
@@ -112,7 +111,7 @@ class Dataset:
         )
         groups.sort_values(by=id.Attribute.CURRENT_VALUE, ascending=False, inplace=True)
         if len(groups) > len(bright_colors):
-            report.error(
+            log.error(
                 "Input data contains too many different groups. "
                 "Because of that, group colors will be reused"
             )
@@ -133,8 +132,8 @@ class Dataset:
             if color_index == len(bright_colors):
                 color_index = 0
 
-    def _append_asset_assets(self, filedict: dict):
-        expected_assets = {
+    def _append_asset_attributes(self, filedict: dict):
+        expected_attributes = {
             id.Attribute.NAME: "name",
             id.Attribute.SYMBOL: "symbol",
             id.Attribute.GROUP: "group",
@@ -143,9 +142,9 @@ class Dataset:
             id.Attribute.FILENAME: "filename",
         }
 
-        for a in expected_assets.values():
+        for a in expected_attributes.values():
             if (a in filedict) and (not isinstance(filedict[a], str)):
-                report.warn(
+                log.warning(
                     f'Attribute "{a}" is of wrong type. Attribute type should be string'
                 )
                 filedict.pop(a)
@@ -160,7 +159,7 @@ class Dataset:
         new_entry = pd.DataFrame(
             {
                 key: filedict[val]
-                for key, val in expected_assets.items()
+                for key, val in expected_attributes.items()
                 if val in filedict
             },
             index=[identifier],
@@ -171,8 +170,8 @@ class Dataset:
         except ValueError as error:
             raise ValueError(
                 "Identical asset _assets found in files "
-                f"{report.italic(self._assets.at[identifier, id.Attribute.FILENAME])} and "
-                f'{report.italic(filedict["filename"])}. Data from latter file is ignored'
+                f"{log.italic(self._assets.at[identifier, id.Attribute.FILENAME])} and "
+                f'{log.italic(filedict["filename"])}. Data from latter file is ignored'
             ) from error
 
     def _append_historical_data(self, data: list, identifier: str):
@@ -194,7 +193,7 @@ class Dataset:
             and id.Column.VALUE not in new_entry.columns
             and id.Column.PRICE not in new_entry.columns
         ):
-            report.report(f"Fetching yfinance data for {report.italic(symbol)}")
+            log.info(f"Fetching yfinance data for {log.italic(symbol)}")
             yfdata = self._yfinance.get_historical_data(symbol, min(new_entry.index))
             self._assets.at[identifier, id.Attribute.YFINANCE_FETCH_SUCCESSFUL] = True
             new_entry = pd.concat([new_entry, yfdata], axis=1)
@@ -239,12 +238,12 @@ class Dataset:
         data = data[data[id.Index.DATE].notnull()]  # remove rows without a date
         data[id.Index.DATE] = pd.to_datetime(data[id.Index.DATE], errors="coerce")
         if any(data[id.Index.DATE].isnull()):
-            report.warn("Unrecognized dates found in data")
+            log.warning("Unrecognized dates found in data")
             data = data[
                 data[id.Index.DATE].notnull()
             ]  # remove rows where date was not converted
         if any(data[id.Index.DATE] > datetime.datetime.now()):
-            report.warn("Future dates found in data, they will be ignored")
+            log.warning("Future dates found in data, they will be ignored")
             data = data[data[id.Index.DATE] <= datetime.datetime.now()]
 
         # filter out unrecognized, negative, and too high values
@@ -254,22 +253,22 @@ class Dataset:
             pd.to_numeric, errors="coerce"
         )
         for col in available_columns:
-            column_name_italic = report.italic(expected_columns[col].name)
+            column_name_italic = log.italic(expected_columns[col].name)
             unrecognized = data[col].isnull() & original_data[col].notnull()
             if any(unrecognized):
-                report.warn(f"Unrecognized data found in {column_name_italic} column")
+                log.warning(f"Unrecognized data found in {column_name_italic} column")
                 data = data[~unrecognized]
                 original_data = original_data[~unrecognized]
             if expected_columns[col].non_negative:
                 negative = data[col] < 0
                 if any(negative):
-                    report.warn(f"Negative values found in {column_name_italic} column")
+                    log.warning(f"Negative values found in {column_name_italic} column")
                     data = data[~negative]
                     original_data = original_data[~negative]
             if expected_columns[col].max_value is not None:
                 too_high = data[col] > expected_columns[col].max_value
                 if any(too_high):
-                    report.warn(
+                    log.warning(
                         f"Too high values found in {column_name_italic} column. "
                         "Values in this column should not exceed "
                         f"{expected_columns[col].max_value}"
