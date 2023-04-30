@@ -5,9 +5,10 @@ import enum
 import os
 import yaml
 
-from source.settings import Settings
-from source import log
 from source import dataset
+from source import log
+from source import report
+from source.settings import Settings
 
 
 class Main:
@@ -24,6 +25,12 @@ class Main:
 
         print(self.dataset.assets)
         self.dataset.get_historical_data_sum(self.dataset.assets).to_csv("out.csv")
+
+        log.info("Generating report")
+        self.report = report.Report(self.dataset, self.settings)
+        log.info("Writing to file")
+        self.report.write_to_file("report.html")
+        log.info("Completed successfully")
 
     def _parse_arguments(self):
         default_input_dir = (

@@ -77,17 +77,17 @@ class Dataset:
         )
 
         for identifier in self._assets.index:
-            self._assets.at[
-                identifier, id.Attribute.CURRENT_VALUE
-            ] = self.historical_data[identifier][id.Column.VALUE].iloc[-1]
+            self._assets.at[identifier, id.Attribute.VALUE] = self.historical_data[
+                identifier
+            ][id.Column.VALUE].iloc[-1]
 
             if any(self.historical_data[identifier][id.Column.VALUE] > 0):
-                self._assets.at[identifier, id.Attribute.IS_RELEVANT] = (
-                    self._assets.at[identifier, id.Attribute.CURRENT_VALUE] != 0
+                self._assets.at[identifier, id.Attribute.ACTIVE] = (
+                    self._assets.at[identifier, id.Attribute.VALUE] != 0
                 )
             else:
                 # Tax "assets" are considered irrelevant, if they weren't updated for a certain amount of time
-                self._assets.at[identifier, id.Attribute.IS_RELEVANT] = max(
+                self._assets.at[identifier, id.Attribute.ACTIVE] = max(
                     self.historical_data[identifier].index
                 ) < (
                     self.latest_date
@@ -99,7 +99,7 @@ class Dataset:
 
     def _reassign_colors(self):
         self._assets.sort_values(
-            by=[id.Attribute.CURRENT_VALUE, id.Attribute.IS_RELEVANT],
+            by=[id.Attribute.VALUE, id.Attribute.ACTIVE],
             inplace=True,
             ascending=False,
         )
@@ -107,9 +107,9 @@ class Dataset:
         bright_colors = px.colors.qualitative.Set1
         pastel_colors = px.colors.qualitative.Pastel1
         groups = self._assets.groupby(id.Attribute.GROUP).agg(
-            {id.Attribute.CURRENT_VALUE: "sum"}
+            {id.Attribute.VALUE: "sum"}
         )
-        groups.sort_values(by=id.Attribute.CURRENT_VALUE, ascending=False, inplace=True)
+        groups.sort_values(by=id.Attribute.VALUE, ascending=False, inplace=True)
         if len(groups) > len(bright_colors):
             log.error(
                 "Input data contains too many different groups. "

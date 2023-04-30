@@ -31,6 +31,6 @@ class Attribute(enum.Enum):
     COLOR = enum.auto()
     INFO = enum.auto()
     FILENAME = enum.auto()
-    CURRENT_VALUE = enum.auto()
-    IS_RELEVANT = enum.auto()
+    VALUE = enum.auto()
+    ACTIVE = enum.auto()
     YFINANCE_FETCH_SUCCESSFUL = enum.auto()

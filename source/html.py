@@ -36,6 +36,12 @@ class _HtmlObject:
     def __radd__(self, other):
         return other + str(self)
 
+    def __mul__(self, multiplier):
+        return str(self) * multiplier
+
+    def __rmul__(self, multiplier):
+        return multiplier * str(self)
+
 
 class Document:
     def __init__(self, title: str, css_variables: dict):
