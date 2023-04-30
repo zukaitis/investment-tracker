@@ -1,10 +1,9 @@
 import babel
 import yfinance as yf
 import pandas as pd
-import inspect
 import pytz
 
-import _report as report
+from source import report
 
 
 class _Setting:

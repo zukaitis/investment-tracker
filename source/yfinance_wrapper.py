@@ -3,9 +3,9 @@ import yfinance as yf
 import pandas as pd
 import supress
 
-import _report as report
-import _settings as settings
-import _dataset as dataset
+from source import report
+from source import settings
+from source import dataset
 
 
 class YfinanceWrapper:

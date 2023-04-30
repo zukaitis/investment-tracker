@@ -5,11 +5,12 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import typing
+import warnings
 
-import _dataset_identification as id
-import _report as report
-import _settings as settings
-import _yfinance_wrapper as yfinance_wrapper
+import source.dataset_identification as id
+from source import report
+from source import settings
+from source import yfinance_wrapper
 
 
 class Dataset:
@@ -60,7 +61,9 @@ class Dataset:
             historical = self.historical_data[a].reindex(all_dates)
             historical[[id.Column.PRICE, id.Column.AMOUNT, id.Column.COMMENT]] = np.nan
             historical = self._interpolate_historical_data(historical)
-            result = result.add(historical)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                result = result.add(historical)
 
         return self._interpolate_historical_data(result)
 
