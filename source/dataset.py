@@ -12,6 +12,7 @@ from source import log
 from source import settings
 from source import yfinance_wrapper
 
+unassigned = "___"
 
 class Dataset:
     def __init__(self, settings: settings.Settings):
@@ -94,7 +95,9 @@ class Dataset:
                     - pd.tseries.frequencies.to_offset(self._settings.relevance_period)
                 )
 
-        self._assets[id.Attribute.GROUP].fillna("Ungrouped", inplace=True)
+        self._assets[id.Attribute.GROUP].fillna(unassigned, inplace=True)
+        self._assets[id.Attribute.ACCOUNT].fillna(unassigned, inplace=True)
+        self._assets[id.Attribute.YFINANCE_FETCH_SUCCESSFUL].fillna(False, inplace=True)
         self._reassign_colors()
 
     def _reassign_colors(self):

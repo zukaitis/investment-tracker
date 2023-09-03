@@ -66,6 +66,7 @@ class Report:
         tabs = []
 
         groups = self._list_by_value(self._dataset.assets, id.Attribute.GROUP)
+        print(groups)
         for group in groups:
             content = ""
 
@@ -76,13 +77,14 @@ class Report:
 
             # Display group total if there is more than one account, or only "mixed" account
             if (len(group_accounts) > 1) or (
-                (len(group_accounts) == 1) and (group_accounts[0] == np.nan)
+                (len(group_accounts) == 1) and (group_accounts[0] == dataset.unassigned) and (len(group_assets) > 1)
             ):
                 content += self._create_historical_data_view(
                     group_assets, f"{group} Total"
                 )
                 content += html.Divider() * 2  # double divider after Total
 
+            print(group_accounts)
             for account in group_accounts:
                 account_assets = group_assets[
                     group_assets[id.Attribute.ACCOUNT] == account
@@ -90,10 +92,21 @@ class Report:
                 account_asset_names = self._list_by_value(
                     account_assets, id.Attribute.NAME
                 )
+                print(account_asset_names)
                 for asset in account_asset_names:
                     content += self._create_historical_data_view(
                         account_assets[account_assets[id.Attribute.NAME] == asset]
                     )
+
+            tabs.append(html.Tab(html.Label(group), content))
+
+        if len(groups) > 1:
+            content = self._create_historical_data_view(
+                        self._dataset.assets
+                    )
+            tabs.append(html.Tab(html.Label("<i>Total</i>"), content, checked=True))
+
+        self._report.append(html.TabContainer(tabs))
 
     def _append_footer(self):
         self._report.append(
@@ -114,26 +127,17 @@ class Report:
         )
         return groups[group_by].unique()
 
-    def _create_historical_data_view(self, assets: pd.DataFrame, name: str = None):
-        first_row = data.iloc[0]
-        title = first_row[id.Attribute.NAME]
-        if name is not None:
-            title = name
+    def _get_successful_fetch_indicator(self, symbol: str) -> str:
+        # TODO: Add a tooltip
+        return f'<span style="color:green;">{symbol}</span>'
 
-        if len(assets) == 1:
-            if ("symbol" in first_row) and (pd.notnull(first_row["symbol"])):
-                title += f" ({first_row['symbol']})"
-            if ("account" in first_row) and (pd.notnull(first_row["account"])):
-                title += f"<br>{first_row['account']}"
-
-            if ("info" not in first_row) or (type(first_row["info"]) is not str):
-                first_row["info"] = ""
-        output = html.Columns(
-            [
-                html.Column(width=50, content=html.Heading2(title)),
-                html.Column(content=html.Paragraph(last_row["info"])),
-            ]
-        )
+    def _create_historical_data_view(self, assets: pd.DataFrame, name: str = None) -> str:
+        first_row = assets.iloc[0]
+        
+        output += _create_historical_data_view_header(assets, name)
+        output += _create_historical_data_view_statistics(assets)
+            
+        return output
         statistics = []
 
         if contains_non_zero_values(data["value"]):
@@ -211,3 +215,29 @@ class Report:
             output += f"{figures}"
 
         return output
+
+    _create_historical_data_view_header(self, assets: pd.DataFrame, name: str = None) -> str:
+        first_row = assets.iloc[0]
+        title = name if (name is not None) else first_row[id.Attribute.NAME]
+
+        if len(assets) == 1:
+            if first_row[id.Attribute.YFINANCE_FETCH_SUCCESSFUL]:
+                title += f" - {self._get_successful_fetch_indicator(first_row[id.Attribute.SYMBOL])}"
+            elif pd.notna(first_row[id.Attribute.SYMBOL]):
+                title += f" - {first_row[id.Attribute.SYMBOL]}"
+
+            if first_row[id.Attribute.ACCOUNT] != dataset.unassigned:
+                title += f"<br>{first_row[id.Attribute.ACCOUNT]}"
+            
+            info = first_row[id.Attribute.INFO] if pd.notna(first_row[id.Attribute.INFO]) else ""
+            return html.Columns(
+                [
+                    html.Column(width=50, content=html.Heading2(title)),
+                    html.Column(content=html.Paragraph(info)),
+                ]
+            )
+
+        return html.Heading2(title)
+
+    _create_historical_data_view_statistics(self, assets: pd.DataFrame) -> str:
+        
