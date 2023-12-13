@@ -14,6 +14,7 @@ from source import yfinance_wrapper
 
 unassigned = "___"
 
+
 class Dataset:
     def __init__(self, settings: settings.Settings):
         self._settings = settings
@@ -49,6 +50,8 @@ class Dataset:
             assets = list(assets.index)
         if not isinstance(assets, list):
             raise TypeError("Parameter should be either a list or DataFrame")
+        if len(assets) == 1:
+            return self.historical_data[assets[0]]
 
         all_dates = pd.Index([])
         for a in assets:
@@ -97,6 +100,7 @@ class Dataset:
 
         self._assets[id.Attribute.GROUP].fillna(unassigned, inplace=True)
         self._assets[id.Attribute.ACCOUNT].fillna(unassigned, inplace=True)
+        self._assets[id.Attribute.SYMBOL].fillna(unassigned, inplace=True)
         self._assets[id.Attribute.YFINANCE_FETCH_SUCCESSFUL].fillna(False, inplace=True)
         self._reassign_colors()
 
@@ -167,12 +171,16 @@ class Dataset:
             },
             index=[identifier],
         )
+        new_entry[id.Attribute.DISPLAY_PRICE] = (
+            bool(filedict["display_price"]) if ("display_price" in filedict) else False
+        )
+
         try:
             # check for duplicate IDs is enabled with verify_integrity
             self._assets = pd.concat([self._assets, new_entry], verify_integrity=True)
         except ValueError as error:
             raise ValueError(
-                "Identical asset _assets found in files "
+                "Identical assets found in files "
                 f"{log.italic(self._assets.at[identifier, id.Attribute.FILENAME])} and "
                 f'{log.italic(filedict["filename"])}. Data from latter file is ignored'
             ) from error
@@ -192,7 +200,7 @@ class Dataset:
 
         symbol = self._assets.at[identifier, id.Attribute.SYMBOL]
         if (
-            symbol is not np.nan
+            symbol is not unassigned
             and id.Column.VALUE not in new_entry.columns
             and id.Column.PRICE not in new_entry.columns
         ):

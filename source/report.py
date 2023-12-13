@@ -77,7 +77,9 @@ class Report:
 
             # Display group total if there is more than one account, or only "mixed" account
             if (len(group_accounts) > 1) or (
-                (len(group_accounts) == 1) and (group_accounts[0] == dataset.unassigned) and (len(group_assets) > 1)
+                (len(group_accounts) == 1)
+                and (group_accounts[0] == dataset.unassigned)
+                and (len(group_assets) > 1)
             ):
                 content += self._create_historical_data_view(
                     group_assets, f"{group} Total"
@@ -101,9 +103,7 @@ class Report:
             tabs.append(html.Tab(html.Label(group), content))
 
         if len(groups) > 1:
-            content = self._create_historical_data_view(
-                        self._dataset.assets
-                    )
+            content = self._create_historical_data_view(self._dataset.assets)
             tabs.append(html.Tab(html.Label("<i>Total</i>"), content, checked=True))
 
         self._report.append(html.TabContainer(tabs))
@@ -131,12 +131,14 @@ class Report:
         # TODO: Add a tooltip
         return f'<span style="color:green;">{symbol}</span>'
 
-    def _create_historical_data_view(self, assets: pd.DataFrame, name: str = None) -> str:
+    def _create_historical_data_view(
+        self, assets: pd.DataFrame, name: str = None
+    ) -> str:
         first_row = assets.iloc[0]
-        
-        output += _create_historical_data_view_header(assets, name)
-        output += _create_historical_data_view_statistics(assets)
-            
+
+        output = self._create_historical_data_view_header(assets, name)
+        output += self._create_historical_data_view_statistics(assets)
+
         return output
         statistics = []
 
@@ -216,20 +218,26 @@ class Report:
 
         return output
 
-    _create_historical_data_view_header(self, assets: pd.DataFrame, name: str = None) -> str:
+    def _create_historical_data_view_header(
+        self, assets: pd.DataFrame, name: str = None
+    ) -> str:
         first_row = assets.iloc[0]
         title = name if (name is not None) else first_row[id.Attribute.NAME]
 
         if len(assets) == 1:
             if first_row[id.Attribute.YFINANCE_FETCH_SUCCESSFUL]:
                 title += f" - {self._get_successful_fetch_indicator(first_row[id.Attribute.SYMBOL])}"
-            elif pd.notna(first_row[id.Attribute.SYMBOL]):
+            elif first_row[id.Attribute.SYMBOL] != dataset.unassigned:
                 title += f" - {first_row[id.Attribute.SYMBOL]}"
 
             if first_row[id.Attribute.ACCOUNT] != dataset.unassigned:
                 title += f"<br>{first_row[id.Attribute.ACCOUNT]}"
-            
-            info = first_row[id.Attribute.INFO] if pd.notna(first_row[id.Attribute.INFO]) else ""
+
+            info = (
+                first_row[id.Attribute.INFO]
+                if pd.notna(first_row[id.Attribute.INFO])
+                else ""
+            )
             return html.Columns(
                 [
                     html.Column(width=50, content=html.Heading2(title)),
@@ -239,5 +247,77 @@ class Report:
 
         return html.Heading2(title)
 
-    _create_historical_data_view_statistics(self, assets: pd.DataFrame) -> str:
-        
+    def _create_historical_data_view_statistics(self, assets: pd.DataFrame) -> str:
+        historical_data = self._dataset.get_historical_data_sum(assets)
+        statistics = []
+
+        if any(historical_data[id.Column.VALUE] != 0):
+            statistics.append(
+                html.Label(
+                    "Value",
+                    html.Value(
+                        self._locale.currency_str(
+                            historical_data.iloc[-1][id.Column.VALUE]
+                        )
+                    ),
+                )
+            )
+        if (len(assets) == 1) and assets.iloc[0][id.Attribute.DISPLAY_PRICE]:
+            statistics.append(
+                html.Label(
+                    "Price",
+                    html.Value(
+                        self._locale.currency_str(
+                            historical_data.iloc[-1][id.Column.PRICE]
+                        )
+                    ),
+                )
+            )
+        # don't display Funds invested, if asset was sold
+        if not (
+            any(historical_data[id.Column.VALUE] != 0)
+            and (historical_data.iloc[-1][id.Column.VALUE] == 0)
+        ):
+            statistics.append(
+                html.Label(
+                    "Funds invested",
+                    html.Value(
+                        self._locale.currency_str(
+                            historical_data.iloc[-1][id.Column.NET_INVESTMENT]
+                        )
+                    ),
+                )
+            )
+        if historical_data.iloc[-1][id.Column.NET_RETURN] != 0:
+            statistics.append(
+                html.Label(
+                    "Return received",
+                    html.Value(
+                        self._locale.currency_str(
+                            historical_data.iloc[-1][id.Column.NET_RETURN]
+                        )
+                    ),
+                )
+            )
+        statistics.append(
+            html.Label(
+                "Net profit",
+                html.Value(
+                    self._locale.currency_str(
+                        historical_data.iloc[-1][id.Column.NET_PROFIT]
+                    )
+                ).color(),
+            )
+        )
+        statistics.append(
+            html.Label(
+                "Relative net profit",
+                html.Value(
+                    self._locale.percentage_str(
+                        historical_data.iloc[-1][id.Column.RELATIVE_NET_PROFIT]
+                    )
+                ).color(),
+            )
+        )
+
+        return f"{html.Columns(statistics)}"

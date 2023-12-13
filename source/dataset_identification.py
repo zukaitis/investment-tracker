@@ -34,3 +34,4 @@ class Attribute(enum.Enum):
     VALUE = enum.auto()
     ACTIVE = enum.auto()
     YFINANCE_FETCH_SUCCESSFUL = enum.auto()
+    DISPLAY_PRICE = enum.auto()
