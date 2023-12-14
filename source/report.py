@@ -140,66 +140,6 @@ class Report:
         output += self._create_historical_data_view_statistics(assets)
 
         return output
-        statistics = []
-
-        if contains_non_zero_values(data["value"]):
-            data["value_change"] = data["profit"] - data["return_received"]
-            c = calculate_value_change(
-                data.set_index("date")["value_change"], iscurrency=True
-            )
-            statistics.append(
-                html.Label(
-                    "Value", html.Value(currency_str(last_row["value"]), valuechange=c)
-                )
-            )
-
-        # don't display Funds invested, if asset was sold
-        if not ((contains_non_zero_values(data["value"])) and (last_row["value"] == 0)):
-            c = calculate_value_change(
-                data.set_index("date")["net_investment"], iscurrency=True
-            )
-            statistics.append(
-                html.Label(
-                    "Funds invested",
-                    html.Value(currency_str(last_row["net_investment"]), valuechange=c),
-                )
-            )
-
-        last_row["return_received"] = round(last_row["return_received"], 2)
-        if last_row["return_received"] != 0:
-            c = calculate_value_change(
-                data.set_index("date")["return_received"], iscurrency=True
-            )
-            statistics.append(
-                html.Label(
-                    "Return received",
-                    html.Value(
-                        currency_str(last_row["return_received"]), valuechange=c
-                    ),
-                )
-            )
-
-        c = calculate_value_change(data.set_index("date")["profit"], iscurrency=True)
-        statistics.append(
-            html.Label(
-                "Net profit",
-                html.Value(currency_str(last_row["profit"]), valuechange=c).color(),
-            )
-        )
-
-        c = calculate_value_change(
-            data.set_index("date")["relative_profit"], ispercentage=True
-        )
-        statistics.append(
-            html.Label(
-                "Relative net profit",
-                html.Value(
-                    percentage_str(last_row["relative_profit"]), valuechange=c
-                ).color(),
-            )
-        )
-
-        output += f"{html.Columns(statistics)}"
 
         if len(data) > 1:
             yearly_figure = plot_yearly_asset_data(data).to_html(
@@ -262,7 +202,13 @@ class Report:
                     ),
                 )
             )
-        if (len(assets) == 1) and assets.iloc[0][id.Attribute.DISPLAY_PRICE]:
+        if (
+            (len(assets) == 1)
+            and assets.iloc[0][id.Attribute.DISPLAY_PRICE]
+            and any(historical_data[id.Column.PRICE] != 0)
+        ):
+            value_change = self._dataset.get_value_change(historical_data[id.Column.PRICE])
+            print(value_change)
             statistics.append(
                 html.Label(
                     "Price",

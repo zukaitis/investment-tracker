@@ -74,6 +74,48 @@ class Dataset:
     def get_monthly_data(self, column: id.Column) -> pd.DataFrame:
         print("yo")
 
+    @dataclasses.dataclass
+    class ValueChange:
+        daily: float = 0
+        monthly: float = 0
+
+    def get_value_change(self, historical_data: pd.Series) -> ValueChange:
+        if len(historical_data) < 2:  # can't have value changes with 1 or 0 values
+            return ValueChange()
+
+        daily_change = 0
+        monthly_change = 0
+
+        delta = pd.tseries.frequencies.to_offset(self._settings.value_change_span)
+        day_ago_index = historical_data.index.get_loc(
+            historical_data.index[-1] - datetime.timedelta(days=1), method="nearest"
+        )
+        # check how recent the data is
+        if ((historical_data.index[-1] - historical_data.index[day_ago_index]) <= delta) and (
+            (self.latest_date - historical_data.index[-1]) <= delta
+        ):
+            daily_change = historical_data.iloc[-1] - historical_data.iloc[day_ago_index]
+
+        # data = data.to_frame()
+        # data["year"] = data.index.year
+        # data["month"] = data.index.month
+        # monthly = data.groupby(["year", "month"]).last().reset_index()
+        # monthly.columns = ["year", "month", "value"]
+        # monthly["m"] = (
+        #     monthly["year"] * 12 + monthly["month"]
+        # )  # month number for easier operations
+        # latest_m = latest_date.year * 12 + latest_date.month
+
+        # if (
+        #     (monthly.loc[monthly.index[-1], "m"] - monthly.loc[monthly.index[-2], "m"]) == 1
+        # ) and (latest_m - monthly.loc[monthly.index[-1], "m"] <= 1):
+        #     change = (
+        #         monthly.loc[monthly.index[-1], "value"]
+        #         - monthly.loc[monthly.index[-2], "value"]
+        #     )
+
+        return Dataset.ValueChange(daily=daily_change, monthly=monthly_change)
+
     def _calculate_attribute_data(self):
         self.latest_date = max([max(a.index) for _, a in self.historical_data.items()])
         self.earliest_date = min(
