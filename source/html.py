@@ -154,9 +154,9 @@ def _is_not_zero(value: str) -> bool:
 class ValueChange(_HtmlObject):
     def __init__(self, daily: str = None, monthly: str = None):
         self._raw = '<span class="value_changes">'
-        if daily != None:
+        if (daily is not None) and (_is_not_zero(daily)):
             self._append_span(daily, "daily_change")
-        if monthly != None:
+        if (monthly is not None) and (_is_not_zero(monthly)):
             self._append_span(monthly, "monthly_change")
         self._raw += "</span>"
 

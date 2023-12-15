@@ -192,13 +192,20 @@ class Report:
         statistics = []
 
         if any(historical_data[id.Column.VALUE] != 0):
+            value_change = self._dataset.get_value_change(
+                historical_data[id.Column.VALUE]
+            )
             statistics.append(
                 html.Label(
                     "Value",
                     html.Value(
                         self._locale.currency_str(
                             historical_data.iloc[-1][id.Column.VALUE]
-                        )
+                        ),
+                        valuechange=html.ValueChange(
+                            self._locale.currency_str(value_change.daily),
+                            self._locale.currency_str(value_change.monthly),
+                        ),
                     ),
                 )
             )
@@ -207,15 +214,20 @@ class Report:
             and assets.iloc[0][id.Attribute.DISPLAY_PRICE]
             and any(historical_data[id.Column.PRICE] != 0)
         ):
-            value_change = self._dataset.get_value_change(historical_data[id.Column.PRICE])
-            print(value_change)
+            value_change = self._dataset.get_value_change(
+                historical_data[id.Column.PRICE]
+            )
             statistics.append(
                 html.Label(
                     "Price",
                     html.Value(
                         self._locale.currency_str(
                             historical_data.iloc[-1][id.Column.PRICE]
-                        )
+                        ),
+                        valuechange=html.ValueChange(
+                            self._locale.currency_str(value_change.daily),
+                            self._locale.currency_str(value_change.monthly),
+                        ),
                     ),
                 )
             )
@@ -224,36 +236,60 @@ class Report:
             any(historical_data[id.Column.VALUE] != 0)
             and (historical_data.iloc[-1][id.Column.VALUE] == 0)
         ):
+            value_change = self._dataset.get_value_change(
+                historical_data[id.Column.NET_INVESTMENT]
+            )
             statistics.append(
                 html.Label(
                     "Funds invested",
                     html.Value(
                         self._locale.currency_str(
                             historical_data.iloc[-1][id.Column.NET_INVESTMENT]
-                        )
+                        ),
+                        valuechange=html.ValueChange(
+                            self._locale.currency_str(value_change.daily),
+                            self._locale.currency_str(value_change.monthly),
+                        ),
                     ),
                 )
             )
         if historical_data.iloc[-1][id.Column.NET_RETURN] != 0:
+            value_change = self._dataset.get_value_change(
+                historical_data[id.Column.NET_RETURN]
+            )
             statistics.append(
                 html.Label(
                     "Return received",
                     html.Value(
                         self._locale.currency_str(
                             historical_data.iloc[-1][id.Column.NET_RETURN]
-                        )
+                        ),
+                        valuechange=html.ValueChange(
+                            self._locale.currency_str(value_change.daily),
+                            self._locale.currency_str(value_change.monthly),
+                        ),
                     ),
                 )
             )
+        value_change = self._dataset.get_value_change(
+            historical_data[id.Column.NET_PROFIT]
+        )
         statistics.append(
             html.Label(
                 "Net profit",
                 html.Value(
                     self._locale.currency_str(
                         historical_data.iloc[-1][id.Column.NET_PROFIT]
-                    )
+                    ),
+                    valuechange=html.ValueChange(
+                        self._locale.currency_str(value_change.daily),
+                        self._locale.currency_str(value_change.monthly),
+                    ),
                 ).color(),
             )
+        )
+        value_change = self._dataset.get_value_change(
+            historical_data[id.Column.RELATIVE_NET_PROFIT]
         )
         statistics.append(
             html.Label(
@@ -261,7 +297,11 @@ class Report:
                 html.Value(
                     self._locale.percentage_str(
                         historical_data.iloc[-1][id.Column.RELATIVE_NET_PROFIT]
-                    )
+                    ),
+                    valuechange=html.ValueChange(
+                        self._locale.percentage_str(value_change.daily),
+                        self._locale.percentage_str(value_change.monthly),
+                    ),
                 ).color(),
             )
         )
