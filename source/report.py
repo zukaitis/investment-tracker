@@ -4,6 +4,7 @@ import pandas as pd
 
 from source import dataset
 from source import dataset_identification as id
+from source import graphing
 from source import html
 from source import locale
 from source import settings
@@ -34,9 +35,10 @@ class Report:
         self._locale = locale.Locale(
             locale=self._settings.locale, currency=self._settings.currency
         )
+        theme_colors = _colors_dark if settings.theme == "dark" else _colors_light
+        self._graphing = graphing.Graphing(self._dataset, self._settings, theme_colors)
 
         self._title = f"{settings.owner} investment portfolio"
-        theme_colors = _colors_dark if settings.theme == "dark" else _colors_light
         self._report = html.Document(title=self._title, css_variables=theme_colors)
 
         self._append_header()
@@ -138,6 +140,7 @@ class Report:
 
         output = self._create_historical_data_view_header(assets, name)
         output += self._create_historical_data_view_statistics(assets)
+        output += self._create_historical_data_figures(assets)
 
         return output
 
@@ -307,3 +310,22 @@ class Report:
         )
 
         return f"{html.Columns(statistics)}"
+
+    def _create_historical_data_figures(self, assets: pd.DataFrame) -> str:
+        historical_data = self._dataset.get_historical_data_sum(assets)
+        if len(historical_data) > 1:
+            yearly_figure = self._graphing.get_yearly_asset_data_plot(historical_data).to_html(
+                full_html=False, include_plotlyjs=True
+            )
+            historical_figure = self._graphing.get_historical_asset_data_plot(historical_data).to_html(
+                full_html=False, include_plotlyjs=True
+            )
+            figures = html.Columns(
+                [
+                    html.Column(width=30, content=yearly_figure),
+                    html.Column(content=historical_figure),
+                ]
+            )
+            return f"{figures}"
+
+        return ""

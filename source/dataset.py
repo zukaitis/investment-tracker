@@ -289,6 +289,8 @@ class Dataset:
         data.rename(columns={"date": id.Index.DATE}, inplace=True)
         if "comment" in data.columns:
             data.rename(columns={"comment": id.Column.COMMENT}, inplace=True)
+        else:
+            data[id.Column.COMMENT] = np.nan
 
         data = data[data[id.Index.DATE].notnull()]  # remove rows without a date
         data[id.Index.DATE] = pd.to_datetime(data[id.Index.DATE], errors="coerce")
