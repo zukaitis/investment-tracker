@@ -41,6 +41,9 @@ class YfinanceWrapper:
                     f"{ticker.fast_info['currency']}{self.settings.currency}=X"
                 )
                 currency_rate = currency_ticker.history(start=start_date, interval="1d")
+                currency_rate.index = currency_rate.index.tz_convert(
+                    self.settings.timezone
+                ).tz_localize(None)
                 data[self.settings.autofill_price_mark] *= currency_rate[
                     self.settings.autofill_price_mark
                 ]

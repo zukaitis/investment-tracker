@@ -59,7 +59,8 @@ class Dataset:
                 all_dates.append(self.historical_data[a].index).unique().sort_values()
             )
 
-        result = pd.DataFrame(columns=id.Column, index=all_dates)
+        # result = pd.DataFrame(columns=id.Column, index=all_dates)
+        result = pd.DataFrame(index=all_dates)
         result[[id.Column.VALUE, id.Column.INVESTMENT, id.Column.RETURN]] = 0
         for a in assets:
             historical = self.historical_data[a].reindex(all_dates)
@@ -209,9 +210,8 @@ class Dataset:
         )
         new_entry = pd.DataFrame(
             {
-                key: filedict[val]
+                key: filedict[val] if val in filedict else unassigned
                 for key, val in expected_attributes.items()
-                if val in filedict
             },
             index=[identifier],
         )
@@ -251,6 +251,8 @@ class Dataset:
             log.info(f"Fetching yfinance data for {log.italic(symbol)}")
             yfdata = self._yfinance.get_historical_data(symbol, min(new_entry.index))
             self._assets.at[identifier, id.Attribute.YFINANCE_FETCH_SUCCESSFUL] = True
+            if id.Column.RETURN in new_entry.columns:
+                yfdata.drop(columns=[id.Column.RETURN], inplace=True)
             new_entry = pd.concat([new_entry, yfdata], axis=1)
 
         new_entry = self._interpolate_historical_data(new_entry)
@@ -349,8 +351,8 @@ class Dataset:
         for col, method in interpolated_columns.items():
             if col not in data.columns:
                 data[col] = np.nan
-            if method is not None:
-                data[col] = data[col].interpolate(method=method)
+            if method == "pad":
+                data[col] = data[col].ffill()
             data[col] = data[col].fillna(0.0)
 
         if id.Column.VALUE not in data.columns:
@@ -364,15 +366,14 @@ class Dataset:
         data[id.Column.VALUE] = data[id.Column.VALUE].interpolate(method="linear")
         data[id.Column.VALUE] = data[id.Column.VALUE].fillna(0.0)
 
+        data[id.Column.NET_SALE_PROFIT] = 0.0
+
         data[id.Column.RETURN] = data[id.Column.RETURN] * (
             1 - data[id.Column.RETURN_TAX]
         )
 
         data = self._fill_period_data(data)
 
-        data[id.Column.NET_SALE_PROFIT] = np.where(
-            data[id.Column.NET_INVESTMENT] < 0, -data[id.Column.NET_INVESTMENT], 0
-        )
         data.loc[data[id.Column.NET_INVESTMENT] < 0, id.Column.NET_INVESTMENT] = 0
         data[id.Column.NET_PROFIT] = (
             data[id.Column.VALUE]
@@ -398,7 +399,7 @@ class Dataset:
 
         data[id.Column.PERIOD] = np.where(start_of_period, 1, np.nan)
         data[id.Column.PERIOD] = (
-            data[id.Column.PERIOD].cumsum().interpolate(method="pad")
+            data[id.Column.PERIOD].cumsum().ffill()
         )
         data[id.Column.PERIOD] = data[id.Column.PERIOD].fillna(0) + 1
 
@@ -416,6 +417,15 @@ class Dataset:
             ].cumsum()
             data.loc[period_mask, id.Column.NET_INVESTMENT] = data.loc[
                 period_mask, id.Column.INVESTMENT
+            ].cumsum()
+            for i in data.loc[period_mask].index:
+                if data.loc[i, id.Column.NET_INVESTMENT] < 0:
+                    sale_profit = -data.loc[i, id.Column.NET_INVESTMENT]
+                    data.loc[i, id.Column.NET_SALE_PROFIT] = sale_profit
+                    last_index = data.loc[period_mask].index[-1]
+                    data.loc[i:last_index, id.Column.NET_INVESTMENT] = data.loc[i:last_index, id.Column.NET_INVESTMENT] + sale_profit
+            data.loc[period_mask, id.Column.NET_SALE_PROFIT] = data.loc[
+                period_mask, id.Column.NET_SALE_PROFIT
             ].cumsum()
             data.loc[period_mask, id.Column.NET_INVESTMENT_MAX] = data.loc[
                 period_mask, id.Column.NET_INVESTMENT

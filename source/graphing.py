@@ -10,7 +10,9 @@ import pandas as pd
 
 
 class Graphing:
-    def __init__(self, dataset: dataset.Dataset, settings: settings.Settings, theme_colors: dict):
+    def __init__(
+        self, dataset: dataset.Dataset, settings: settings.Settings, theme_colors: dict
+    ):
         self._dataset = dataset
         self._settings = settings
         self._locale = locale.Locale(
@@ -79,7 +81,8 @@ class Graphing:
         ]
         fig.update_xaxes(range=six_months)
         fig.update_yaxes(
-            ticksuffix=self._locale.currency_tick_suffix(), tickprefix=self._locale.currency_tick_prefix()
+            ticksuffix=self._locale.currency_tick_suffix(),
+            tickprefix=self._locale.currency_tick_prefix(),
         )
         configure_historical_dataview(fig, latest_date - value_by_date.index[0])
 
@@ -90,20 +93,27 @@ class Graphing:
 
         # filter price-only data, where period is 0
         # take earliest value of each year, and append overall latest value
-        yearly_data = data[data[id.Column.PERIOD] != 0].groupby(data.index.year).head(1)
-        yearly_data = yearly_data.append(data.iloc[-1])
+        #yearly_data = data[data[id.Column.PERIOD] != 0].groupby(data.index.year).head(1)
+        yearly_data = data.groupby(data.index.year).head(1)
+        yearly_data = yearly_data._append(data.iloc[-1])
 
-        yearly_data["value_change"] = yearly_data[id.Column.NET_PROFIT] - yearly_data[id.Column.NET_RETURN]
+        yearly_data["value_change"] = (
+            yearly_data[id.Column.NET_PROFIT] - yearly_data[id.Column.NET_RETURN]
+        )
         yearly_data.loc[yearly_data.index[0], "value_change"] = 0
         yearly_data["value_change"] = yearly_data["value_change"].diff()
         yearly_data.loc[yearly_data.index[0], "total_return_received"] = 0
-        yearly_data["total_return_received"] = yearly_data["total_return_received"].diff()
+        yearly_data["total_return_received"] = yearly_data[
+            "total_return_received"
+        ].diff()
 
         # subtract one year from each date, since these lines are going to represent value change,
         # which occured during previous year
         yearly_data["date"] = yearly_data.index.year - 1
         if yearly_data.index[-1] != yearly_data.index[-2]:
-            yearly_data.loc[yearly_data.index[-1], "date"] += 1  # set back year of last row
+            yearly_data.loc[
+                yearly_data.index[-1], "date"
+            ] += 1  # set back year of last row
         yearly_data.drop(yearly_data.head(1).index, inplace=True)  # remove first row
         yearly_data.drop_duplicates(subset=["date"], inplace=True)
 
@@ -111,7 +121,8 @@ class Graphing:
             yearly_data["value_change"] / yearly_data[id.Column.NET_INVESTMENT_MAX]
         )
         yearly_data["relative_return_received"] = (
-            yearly_data["total_return_received"] / yearly_data[id.Column.NET_INVESTMENT_MAX]
+            yearly_data["total_return_received"]
+            / yearly_data[id.Column.NET_INVESTMENT_MAX]
         )
 
         yearly_data["value_change_positive"] = np.where(
@@ -136,7 +147,9 @@ class Graphing:
             yearly_data["str_value_change_negative"] = (
                 yearly_data["value_change_negative"].apply(self._locale.currency_str)
                 + " / "
-                + yearly_data["relative_value_change"].apply(self._locale.percentage_str)
+                + yearly_data["relative_value_change"].apply(
+                    self._locale.percentage_str
+                )
             )
         else:
             yearly_data["str_value_change_negative"] = abs(
@@ -167,7 +180,8 @@ class Graphing:
             )
         else:
             hovertemplate = (
-                f"<b>%{{x}}</b><br>" f"Funds invested:<br>%{{customdata}}<extra></extra>"
+                f"<b>%{{x}}</b><br>"
+                f"Funds invested:<br>%{{customdata}}<extra></extra>"
             )
 
         fig.add_trace(
@@ -206,18 +220,31 @@ class Graphing:
         fig = go.Figure()
 
         data = input.copy()
-        data["value_and_return"] = data[id.Column.NET_INVESTMENT] + data[id.Column.NET_PROFIT]
+        data["value_and_return"] = (
+            data[id.Column.NET_INVESTMENT] + data[id.Column.NET_PROFIT]
+        )
 
-        data["str_net_investment"] = data[id.Column.NET_INVESTMENT].apply(self._locale.currency_str)
-        data["str_return_received"] = data[id.Column.NET_RETURN].apply(self._locale.currency_str)
+        data["str_net_investment"] = data[id.Column.NET_INVESTMENT].apply(
+            self._locale.currency_str
+        )
+        data["str_return_received"] = data[id.Column.NET_RETURN].apply(
+            self._locale.currency_str
+        )
+        data["str_net_sale_profit"] = data[id.Column.NET_SALE_PROFIT].apply(
+            self._locale.currency_str
+        )
         data["str_value"] = data[id.Column.VALUE].apply(self._locale.currency_str)
         if any(data[id.Column.AMOUNT] != 0):
-            data["str_net_investment"] += "<br><b>Amount:</b> " + data[id.Column.AMOUNT].apply(
-                self._locale.decimal_str
-            )
+            data["str_net_investment"] += "<br><b>Amount:</b> " + data[
+                id.Column.AMOUNT
+            ].apply(self._locale.decimal_str)
 
-        data["f_profit"] = data[id.Column.NET_PROFIT].apply(self._locale.currency_str) + " / "
-        data["f_relative_profit"] = data[id.Column.RELATIVE_NET_PROFIT].apply(self._locale.percentage_str)
+        data["f_profit"] = (
+            data[id.Column.NET_PROFIT].apply(self._locale.currency_str) + " / "
+        )
+        data["f_relative_profit"] = data[id.Column.RELATIVE_NET_PROFIT].apply(
+            self._locale.percentage_str
+        )
         data["profit_string"] = data["f_profit"] + data["f_relative_profit"]
 
         for p in input[id.Column.PERIOD].dropna().unique():
@@ -281,6 +308,20 @@ class Graphing:
                     )
                 )
                 blue_fill_mode = "tonexty"
+            if max(pdata[id.Column.NET_SALE_PROFIT]) > 0:
+                fig.add_trace(
+                    go.Scatter(
+                        x=pdata.index,
+                        y=pdata[id.Column.NET_RETURN]+pdata[id.Column.NET_SALE_PROFIT],
+                        fill="tonexty",
+                        mode="none",
+                        fillcolor="rgba(0,0,0,0)",
+                        customdata=pdata["str_net_sale_profit"],
+                        showlegend=False,
+                        hovertemplate=f"<b>Sale profit:</b> %{{customdata}}<extra></extra>",
+                    )
+                )
+                blue_fill_mode = "tonexty"
 
             blue_fill = pdata[["red_fill", "value_and_return"]].copy()
             blue_fill["date"] = blue_fill.index
@@ -297,7 +338,9 @@ class Graphing:
             intermediate_values.index += 1
             intermediate_values["y"] = np.nan
             blue_fill = (
-                blue_fill.append(intermediate_values).sort_index().reset_index(drop=True)
+                blue_fill._append(intermediate_values)
+                .sort_index()
+                .reset_index(drop=True)
             )
             blue_fill["slope"] = abs(
                 blue_fill["value_and_return"] - blue_fill["red_fill"]
@@ -311,7 +354,8 @@ class Graphing:
             blue_fill["date"] = np.where(
                 pd.isna(blue_fill["y"]),
                 (
-                    (blue_fill.shift(-1)["date"] - blue_fill["date"]) * blue_fill["slope"]
+                    (blue_fill.shift(-1)["date"] - blue_fill["date"])
+                    * blue_fill["slope"]
                     + blue_fill["date"]
                 ),
                 blue_fill["date"],
@@ -364,7 +408,9 @@ class Graphing:
         frequency = Graphing._calculate_frequency(data.index)
         earliest_entry_date = input.index[0]
         latest_entry_date = input.index[-1]
-        self._configure_historical_dataview(fig, self._dataset.latest_date - earliest_entry_date, frequency)
+        self._configure_historical_dataview(
+            fig, self._dataset.latest_date - earliest_entry_date, frequency
+        )
         span = pd.DateOffset(years=1)
         if (frequency in ["H", "BH"]) and (  # hourly data
             self._dataset.latest_date - latest_entry_date < datetime.timedelta(days=3)
@@ -376,7 +422,9 @@ class Graphing:
             span = pd.DateOffset(months=1)
         range = [self._dataset.latest_date - span, self._dataset.latest_date]
         fig.update_xaxes(range=range, rangeslider=dict(visible=True))
-        max_value = max(max(data[id.Column.NET_INVESTMENT]), max(data["value_and_return"]))
+        max_value = max(
+            max(data[id.Column.NET_INVESTMENT]), max(data["value_and_return"])
+        )
         fig.update_yaxes(
             ticksuffix=self._locale.currency_tick_suffix(),
             tickprefix=self._locale.currency_tick_prefix(),
@@ -384,7 +432,9 @@ class Graphing:
         )
 
         if any(data[id.Column.PRICE] != 0):  # check if price data is present
-            data["price_string"] = data[id.Column.PRICE].apply(self._locale.currency_str)
+            data["price_string"] = data[id.Column.PRICE].apply(
+                self._locale.currency_str
+            )
             fig.add_trace(
                 go.Scatter(
                     x=data.index,
@@ -409,7 +459,10 @@ class Graphing:
                     ticksuffix=self._locale.currency_tick_suffix(),
                     tickprefix=self._locale.currency_tick_prefix(),
                     side="right",
-                    range=[min(data[id.Column.PRICE]) - margin, max(data[id.Column.PRICE]) + margin],
+                    range=[
+                        min(data[id.Column.PRICE]) - margin,
+                        max(data[id.Column.PRICE]) + margin,
+                    ],
                 )
             )
             fig.update_layout(margin=dict(r=2))
@@ -422,7 +475,9 @@ class Graphing:
                 y=[max_value * 0.05]
                 * len(comments),  # display comment mark at 5% of max y value
                 mode="markers",
-                marker=dict(line=dict(width=2, color="purple"), size=12, symbol="asterisk"),
+                marker=dict(
+                    line=dict(width=2, color="purple"), size=12, symbol="asterisk"
+                ),
                 customdata=comments[id.Column.COMMENT],
                 hovertemplate=f"<b>*</b> %{{customdata}}<extra></extra>",
                 showlegend=False,
@@ -442,8 +497,8 @@ class Graphing:
             elif period < datetime.timedelta(days=2):
                 return "D"  # daily
 
-    def _configure_historical_dataview(self,
-        figure: go.Figure, timerange: datetime.timedelta, frequency: str = None
+    def _configure_historical_dataview(
+        self, figure: go.Figure, timerange: datetime.timedelta, frequency: str = None
     ):
         buttons = []
 

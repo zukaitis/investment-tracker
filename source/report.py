@@ -314,12 +314,12 @@ class Report:
     def _create_historical_data_figures(self, assets: pd.DataFrame) -> str:
         historical_data = self._dataset.get_historical_data_sum(assets)
         if len(historical_data) > 1:
-            yearly_figure = self._graphing.get_yearly_asset_data_plot(historical_data).to_html(
-                full_html=False, include_plotlyjs=True
-            )
-            historical_figure = self._graphing.get_historical_asset_data_plot(historical_data).to_html(
-                full_html=False, include_plotlyjs=True
-            )
+            yearly_figure = self._graphing.get_yearly_asset_data_plot(
+                historical_data
+            ).to_html(full_html=False, include_plotlyjs=True)
+            historical_figure = self._graphing.get_historical_asset_data_plot(
+                historical_data
+            ).to_html(full_html=False, include_plotlyjs=True)
             figures = html.Columns(
                 [
                     html.Column(width=30, content=yearly_figure),
