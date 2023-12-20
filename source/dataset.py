@@ -249,10 +249,10 @@ class Dataset:
             and id.Column.PRICE not in new_entry.columns
         ):
             log.info(f"Fetching yfinance data for {log.italic(symbol)}")
-            yfdata = self._yfinance.get_historical_data(symbol, min(new_entry.index))
+            yfdata = self._yfinance.get_historical_data(
+                symbol, min(new_entry.index) - datetime.timedelta(days=7)
+            )
             self._assets.at[identifier, id.Attribute.YFINANCE_FETCH_SUCCESSFUL] = True
-            if id.Column.RETURN in new_entry.columns:
-                yfdata.drop(columns=[id.Column.RETURN], inplace=True)
             new_entry = pd.concat([new_entry, yfdata], axis=1)
 
         new_entry = self._interpolate_historical_data(new_entry)
@@ -343,6 +343,7 @@ class Dataset:
             id.Column.AMOUNT: "pad",
             id.Column.PRICE: "pad",
             id.Column.INVESTMENT: None,
+            id.Column.RETURN_PER_UNIT: None,
             id.Column.RETURN: None,
             id.Column.RETURN_TAX: "pad",
         }
@@ -368,6 +369,12 @@ class Dataset:
 
         data[id.Column.NET_SALE_PROFIT] = 0.0
 
+        if (not self._contains_non_zero_values(data[id.Column.RETURN])) and (
+            self._contains_non_zero_values(data[id.Column.RETURN_PER_UNIT])
+        ):
+            data[id.Column.RETURN] = (
+                data[id.Column.RETURN_PER_UNIT] * data[id.Column.AMOUNT]
+            )
         data[id.Column.RETURN] = data[id.Column.RETURN] * (
             1 - data[id.Column.RETURN_TAX]
         )
@@ -398,9 +405,7 @@ class Dataset:
         )
 
         data[id.Column.PERIOD] = np.where(start_of_period, 1, np.nan)
-        data[id.Column.PERIOD] = (
-            data[id.Column.PERIOD].cumsum().ffill()
-        )
+        data[id.Column.PERIOD] = data[id.Column.PERIOD].cumsum().ffill()
         data[id.Column.PERIOD] = data[id.Column.PERIOD].fillna(0) + 1
 
         zero_mask = (
@@ -423,7 +428,9 @@ class Dataset:
                     sale_profit = -data.loc[i, id.Column.NET_INVESTMENT]
                     data.loc[i, id.Column.NET_SALE_PROFIT] = sale_profit
                     last_index = data.loc[period_mask].index[-1]
-                    data.loc[i:last_index, id.Column.NET_INVESTMENT] = data.loc[i:last_index, id.Column.NET_INVESTMENT] + sale_profit
+                    data.loc[i:last_index, id.Column.NET_INVESTMENT] = (
+                        data.loc[i:last_index, id.Column.NET_INVESTMENT] + sale_profit
+                    )
             data.loc[period_mask, id.Column.NET_SALE_PROFIT] = data.loc[
                 period_mask, id.Column.NET_SALE_PROFIT
             ].cumsum()

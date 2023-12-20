@@ -14,6 +14,7 @@ class Column(enum.Enum):
     PERIOD = enum.auto()
     NET_INVESTMENT = enum.auto()
     NET_INVESTMENT_MAX = enum.auto()
+    RETURN_PER_UNIT = enum.auto()
     RETURN = enum.auto()
     NET_RETURN = enum.auto()
     RETURN_TAX = enum.auto()

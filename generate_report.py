@@ -34,7 +34,7 @@ class Main:
 
     def _parse_arguments(self):
         default_input_dir = (
-            f"{os.path.dirname(os.path.realpath(__file__))}{os.path.sep}less_data"
+            f"{os.path.dirname(os.path.realpath(__file__))}{os.path.sep}private_data"
         )
 
         parser = argparse.ArgumentParser()

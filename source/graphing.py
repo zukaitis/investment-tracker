@@ -4,6 +4,7 @@ from source import locale
 from source import settings
 
 import datetime
+import enum
 import plotly.graph_objects as go
 import numpy as np
 import pandas as pd
@@ -89,71 +90,98 @@ class Graphing:
         return fig
 
     def get_yearly_asset_data_plot(self, data: pd.DataFrame) -> go.Figure:
+        class Column(enum.Enum):
+            DATE = enum.auto()
+            VALUE_CHANGE = enum.auto()
+            VALUE_CHANGE_POSITIVE = enum.auto()
+            VALUE_CHANGE_NEGATIVE = enum.auto()
+            VALUE_CHANGE_POSITIVE_STRING = enum.auto()
+            VALUE_CHANGE_NEGATIVE_STRING = enum.auto()
+            RELATIVE_VALUE_CHANGE = enum.auto()
+            RELATIVE_NET_RETURN = enum.auto()
+            NET_RETURN_STRING = enum.auto()
+            RELATIVE_NET_SALE_PROFIT = enum.auto()
+            NET_SALE_PROFIT_STRING = enum.auto()
+
         fig = go.Figure()
 
         # filter price-only data, where period is 0
         # take earliest value of each year, and append overall latest value
-        #yearly_data = data[data[id.Column.PERIOD] != 0].groupby(data.index.year).head(1)
+        # yearly_data = data[data[id.Column.PERIOD] != 0].groupby(data.index.year).head(1)
         yearly_data = data.groupby(data.index.year).head(1)
         yearly_data = yearly_data._append(data.iloc[-1])
+        print(yearly_data)
 
-        yearly_data["value_change"] = (
-            yearly_data[id.Column.NET_PROFIT] - yearly_data[id.Column.NET_RETURN]
+        yearly_data[Column.VALUE_CHANGE] = (
+            yearly_data[id.Column.NET_PROFIT] - yearly_data[id.Column.NET_RETURN] - yearly_data[id.Column.NET_SALE_PROFIT]
         )
-        yearly_data.loc[yearly_data.index[0], "value_change"] = 0
-        yearly_data["value_change"] = yearly_data["value_change"].diff()
-        yearly_data.loc[yearly_data.index[0], "total_return_received"] = 0
-        yearly_data["total_return_received"] = yearly_data[
-            "total_return_received"
+        yearly_data.loc[yearly_data.index[0], Column.VALUE_CHANGE] = 0
+        yearly_data[Column.VALUE_CHANGE] = yearly_data[Column.VALUE_CHANGE].diff()
+        yearly_data.loc[yearly_data.index[0], id.Column.NET_RETURN] = 0
+        yearly_data[id.Column.NET_RETURN] = yearly_data[
+            id.Column.NET_RETURN
+        ].diff()
+        yearly_data.loc[yearly_data.index[0], id.Column.NET_SALE_PROFIT] = 0
+        yearly_data[id.Column.NET_SALE_PROFIT] = yearly_data[
+            id.Column.NET_SALE_PROFIT
         ].diff()
 
         # subtract one year from each date, since these lines are going to represent value change,
         # which occured during previous year
-        yearly_data["date"] = yearly_data.index.year - 1
+        yearly_data[Column.DATE] = yearly_data.index.year - 1
         if yearly_data.index[-1] != yearly_data.index[-2]:
             yearly_data.loc[
-                yearly_data.index[-1], "date"
+                yearly_data.index[-1], Column.DATE
             ] += 1  # set back year of last row
         yearly_data.drop(yearly_data.head(1).index, inplace=True)  # remove first row
-        yearly_data.drop_duplicates(subset=["date"], inplace=True)
+        yearly_data.drop_duplicates(subset=[Column.DATE], inplace=True)
 
-        yearly_data["relative_value_change"] = abs(
-            yearly_data["value_change"] / yearly_data[id.Column.NET_INVESTMENT_MAX]
+        yearly_data[Column.RELATIVE_VALUE_CHANGE] = abs(
+            yearly_data[Column.VALUE_CHANGE] / yearly_data[id.Column.NET_INVESTMENT_MAX]
         )
-        yearly_data["relative_return_received"] = (
-            yearly_data["total_return_received"]
+        yearly_data[Column.RELATIVE_NET_RETURN] = (
+            yearly_data[id.Column.NET_RETURN]
+            / yearly_data[id.Column.NET_INVESTMENT_MAX]
+        )
+        yearly_data[Column.RELATIVE_NET_SALE_PROFIT] = (
+            yearly_data[id.Column.NET_SALE_PROFIT]
             / yearly_data[id.Column.NET_INVESTMENT_MAX]
         )
 
-        yearly_data["value_change_positive"] = np.where(
-            yearly_data["value_change"] > 0, yearly_data["value_change"], 0
+        yearly_data[Column.VALUE_CHANGE_POSITIVE] = np.where(
+            yearly_data[Column.VALUE_CHANGE] > 0, yearly_data[Column.VALUE_CHANGE], 0
         )
-        yearly_data["value_change_negative"] = np.where(
-            yearly_data["value_change"] < 0, yearly_data["value_change"], 0
+        yearly_data[Column.VALUE_CHANGE_NEGATIVE] = np.where(
+            yearly_data[Column.VALUE_CHANGE] < 0, yearly_data[Column.VALUE_CHANGE], 0
         )
-        yearly_data["str_total_return_received"] = (
-            yearly_data["total_return_received"].apply(self._locale.currency_str)
+        yearly_data[Column.NET_RETURN_STRING] = (
+            yearly_data[id.Column.NET_RETURN].apply(self._locale.currency_str)
             + " / "
-            + yearly_data["relative_return_received"].apply(self._locale.percentage_str)
+            + yearly_data[Column.RELATIVE_NET_RETURN].apply(self._locale.percentage_str)
         )
-        yearly_data["str_value_change_positive"] = (
+        yearly_data[Column.NET_SALE_PROFIT_STRING] = (
+            yearly_data[id.Column.NET_SALE_PROFIT].apply(self._locale.currency_str)
+            + " / "
+            + yearly_data[Column.RELATIVE_NET_SALE_PROFIT].apply(self._locale.percentage_str)
+        )
+        yearly_data[Column.VALUE_CHANGE_POSITIVE_STRING] = (
             "+"
-            + yearly_data["value_change_positive"].apply(self._locale.currency_str)
+            + yearly_data[Column.VALUE_CHANGE_POSITIVE].apply(self._locale.currency_str)
             + " / "
-            + yearly_data["relative_value_change"].apply(self._locale.percentage_str)
+            + yearly_data[Column.RELATIVE_VALUE_CHANGE].apply(self._locale.percentage_str)
         )
 
         if any(data[id.Column.VALUE] != 0):
-            yearly_data["str_value_change_negative"] = (
-                yearly_data["value_change_negative"].apply(self._locale.currency_str)
+            yearly_data[Column.VALUE_CHANGE_NEGATIVE_STRING] = (
+                yearly_data[Column.VALUE_CHANGE_NEGATIVE].apply(self._locale.currency_str)
                 + " / "
-                + yearly_data["relative_value_change"].apply(
+                + yearly_data[Column.RELATIVE_VALUE_CHANGE].apply(
                     self._locale.percentage_str
                 )
             )
         else:
-            yearly_data["str_value_change_negative"] = abs(
-                yearly_data["value_change_negative"]
+            yearly_data[Column.VALUE_CHANGE_NEGATIVE_STRING] = abs(
+                yearly_data[Column.VALUE_CHANGE_NEGATIVE]
             ).apply(self._locale.currency_str)
 
         bar_width = (
@@ -162,14 +190,27 @@ class Graphing:
 
         fig.add_trace(
             go.Bar(
-                x=yearly_data["date"],
-                y=yearly_data["total_return_received"],
+                x=yearly_data[Column.DATE],
+                y=yearly_data[id.Column.NET_RETURN],
                 marker=dict(color="rgb(73,200,22)"),
                 width=bar_width,
-                customdata=np.transpose(yearly_data["str_total_return_received"]),
+                customdata=np.transpose(yearly_data[Column.NET_RETURN_STRING]),
                 hovertemplate=(
                     f"<b>%{{x}}</b><br>"
                     f"Return received:<br>%{{customdata}}<extra></extra>"
+                ),
+            )
+        )
+        fig.add_trace(
+            go.Bar(
+                x=yearly_data[Column.DATE],
+                y=yearly_data[id.Column.NET_SALE_PROFIT],
+                marker=dict(color="rgb(73,200,22)"),
+                width=bar_width,
+                customdata=np.transpose(yearly_data[Column.NET_SALE_PROFIT_STRING]),
+                hovertemplate=(
+                    f"<b>%{{x}}</b><br>"
+                    f"Sale Profit:<br>%{{customdata}}<extra></extra>"
                 ),
             )
         )
@@ -186,22 +227,22 @@ class Graphing:
 
         fig.add_trace(
             go.Bar(
-                x=yearly_data["date"],
-                y=yearly_data["value_change_positive"],
+                x=yearly_data[Column.DATE],
+                y=yearly_data[Column.VALUE_CHANGE_POSITIVE],
                 marker=dict(color="rgba(0, 255, 0, 0.7)"),
                 width=bar_width,
                 hovertemplate=hovertemplate,
-                customdata=np.transpose(yearly_data["str_value_change_positive"]),
+                customdata=np.transpose(yearly_data[Column.VALUE_CHANGE_POSITIVE_STRING]),
             )
         )
         fig.add_trace(
             go.Bar(
-                x=yearly_data["date"],
-                y=yearly_data["value_change_negative"],
+                x=yearly_data[Column.DATE],
+                y=yearly_data[Column.VALUE_CHANGE_NEGATIVE],
                 marker=dict(color="rgba(255, 0, 0, 0.7)"),
                 width=bar_width,
                 hovertemplate=hovertemplate,
-                customdata=np.transpose(yearly_data["str_value_change_negative"]),
+                customdata=np.transpose(yearly_data[Column.VALUE_CHANGE_NEGATIVE_STRING]),
             )
         )
 
@@ -264,9 +305,10 @@ class Graphing:
             )
 
             pdata["red_fill"] = np.where(
-                pdata[id.Column.NET_INVESTMENT] > pdata[id.Column.NET_RETURN],
+                pdata[id.Column.NET_INVESTMENT]
+                > (pdata[id.Column.NET_RETURN] + pdata[id.Column.NET_SALE_PROFIT]),
                 pdata[id.Column.NET_INVESTMENT],
-                pdata[id.Column.NET_RETURN],
+                pdata[id.Column.NET_RETURN] + pdata[id.Column.NET_SALE_PROFIT],
             )
             fig.add_trace(
                 go.Scatter(
@@ -312,7 +354,8 @@ class Graphing:
                 fig.add_trace(
                     go.Scatter(
                         x=pdata.index,
-                        y=pdata[id.Column.NET_RETURN]+pdata[id.Column.NET_SALE_PROFIT],
+                        y=pdata[id.Column.NET_RETURN]
+                        + pdata[id.Column.NET_SALE_PROFIT],
                         fill="tonexty",
                         mode="none",
                         fillcolor="rgba(0,0,0,0)",

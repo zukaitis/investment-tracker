@@ -57,11 +57,11 @@ class YfinanceWrapper:
         data = data.rename(
             columns={
                 self.settings.autofill_price_mark: dataset.id.Column.PRICE,
-                "Dividends": dataset.id.Column.RETURN,
+                "Dividends": dataset.id.Column.RETURN_PER_UNIT,
             }
         )
 
-        return data[[dataset.id.Column.PRICE, dataset.id.Column.RETURN]]
+        return data[[dataset.id.Column.PRICE, dataset.id.Column.RETURN_PER_UNIT]]
 
     def get_info(symbol: str) -> str:
         ticker = yf.Ticker(symbol)
