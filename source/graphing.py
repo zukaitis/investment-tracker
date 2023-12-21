@@ -106,11 +106,10 @@ class Graphing:
         fig = go.Figure()
 
         # filter price-only data, where period is 0
+        yearly_data = data[data[id.Column.PERIOD] != 0]
         # take earliest value of each year, and append overall latest value
-        # yearly_data = data[data[id.Column.PERIOD] != 0].groupby(data.index.year).head(1)
-        yearly_data = data.groupby(data.index.year).head(1)
+        yearly_data = yearly_data.groupby(yearly_data.index.year).head(1)
         yearly_data = yearly_data._append(data.iloc[-1])
-        print(yearly_data)
 
         yearly_data[Column.VALUE_CHANGE] = (
             yearly_data[id.Column.NET_PROFIT] - yearly_data[id.Column.NET_RETURN] - yearly_data[id.Column.NET_SALE_PROFIT]

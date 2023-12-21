@@ -63,10 +63,10 @@ class YfinanceWrapper:
 
         return data[[dataset.id.Column.PRICE, dataset.id.Column.RETURN_PER_UNIT]]
 
-    def get_info(symbol: str) -> str:
+    def get_info(self, symbol: str) -> str:
         ticker = yf.Ticker(symbol)
-        if "description" in ticker.fast_info:
-            return ticker.fast_info["description"]
-        if "longBusinessSummary" in ticker.fast_info:
-            return ticker.fast_info["longBusinessSummary"]
-        return ""
+        if "description" in ticker.info:
+            return ticker.info["description"]
+        if "longBusinessSummary" in ticker.info:
+            return ticker.info["longBusinessSummary"]
+        return dataset.unassigned

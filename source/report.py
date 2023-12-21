@@ -88,7 +88,6 @@ class Report:
                 )
                 content += html.Divider() * 2  # double divider after Total
 
-            print(group_accounts)
             for account in group_accounts:
                 account_assets = group_assets[
                     group_assets[id.Attribute.ACCOUNT] == account
@@ -96,11 +95,17 @@ class Report:
                 account_asset_names = self._list_by_value(
                     account_assets, id.Attribute.NAME
                 )
-                print(account_asset_names)
+
+                if (account != dataset.unassigned) and (len(account_asset_names) > 1):
+                    content += self._create_historical_data_view(
+                        account_assets, f"{account} Total"
+                    )
+
                 for asset in account_asset_names:
                     content += self._create_historical_data_view(
                         account_assets[account_assets[id.Attribute.NAME] == asset]
                     )
+                content += html.Divider()
 
             tabs.append(html.Tab(html.Label(group), content))
 
