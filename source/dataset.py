@@ -218,8 +218,12 @@ class Dataset:
         new_entry[id.Attribute.DISPLAY_PRICE] = (
             bool(filedict["display_price"]) if ("display_price" in filedict) else False
         )
-        if (new_entry.iloc[0][id.Attribute.INFO] == unassigned) and (new_entry.iloc[0][id.Attribute.SYMBOL] != unassigned):
-            new_entry[id.Attribute.INFO] = self._yfinance.get_info(new_entry.iloc[0][id.Attribute.SYMBOL])
+        if (new_entry.iloc[0][id.Attribute.INFO] == unassigned) and (
+            new_entry.iloc[0][id.Attribute.SYMBOL] != unassigned
+        ):
+            new_entry[id.Attribute.INFO] = self._yfinance.get_info(
+                new_entry.iloc[0][id.Attribute.SYMBOL]
+            )
 
         try:
             # check for duplicate IDs is enabled with verify_integrity

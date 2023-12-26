@@ -89,7 +89,7 @@ class Graphing:
 
         return fig
 
-    def get_yearly_asset_data_plot(self, data: pd.DataFrame) -> go.Figure:
+    def get_yearly_asset_data_plot(self, input_data: pd.DataFrame) -> go.Figure:
         class Column(enum.Enum):
             DATE = enum.auto()
             VALUE_CHANGE = enum.auto()
@@ -105,21 +105,21 @@ class Graphing:
 
         fig = go.Figure()
 
-        # filter price-only data, where period is 0
-        yearly_data = data[data[id.Column.PERIOD] != 0]
+        # filter out price-only data, where period is 0
+        data = input_data[input_data[id.Column.PERIOD] != 0]
         # take earliest value of each year, and append overall latest value
-        yearly_data = yearly_data.groupby(yearly_data.index.year).head(1)
+        yearly_data = data.groupby(data.index.year).head(1)
         yearly_data = yearly_data._append(data.iloc[-1])
 
         yearly_data[Column.VALUE_CHANGE] = (
-            yearly_data[id.Column.NET_PROFIT] - yearly_data[id.Column.NET_RETURN] - yearly_data[id.Column.NET_SALE_PROFIT]
+            yearly_data[id.Column.NET_PROFIT]
+            - yearly_data[id.Column.NET_RETURN]
+            - yearly_data[id.Column.NET_SALE_PROFIT]
         )
         yearly_data.loc[yearly_data.index[0], Column.VALUE_CHANGE] = 0
         yearly_data[Column.VALUE_CHANGE] = yearly_data[Column.VALUE_CHANGE].diff()
         yearly_data.loc[yearly_data.index[0], id.Column.NET_RETURN] = 0
-        yearly_data[id.Column.NET_RETURN] = yearly_data[
-            id.Column.NET_RETURN
-        ].diff()
+        yearly_data[id.Column.NET_RETURN] = yearly_data[id.Column.NET_RETURN].diff()
         yearly_data.loc[yearly_data.index[0], id.Column.NET_SALE_PROFIT] = 0
         yearly_data[id.Column.NET_SALE_PROFIT] = yearly_data[
             id.Column.NET_SALE_PROFIT
@@ -161,18 +161,24 @@ class Graphing:
         yearly_data[Column.NET_SALE_PROFIT_STRING] = (
             yearly_data[id.Column.NET_SALE_PROFIT].apply(self._locale.currency_str)
             + " / "
-            + yearly_data[Column.RELATIVE_NET_SALE_PROFIT].apply(self._locale.percentage_str)
+            + yearly_data[Column.RELATIVE_NET_SALE_PROFIT].apply(
+                self._locale.percentage_str
+            )
         )
         yearly_data[Column.VALUE_CHANGE_POSITIVE_STRING] = (
             "+"
             + yearly_data[Column.VALUE_CHANGE_POSITIVE].apply(self._locale.currency_str)
             + " / "
-            + yearly_data[Column.RELATIVE_VALUE_CHANGE].apply(self._locale.percentage_str)
+            + yearly_data[Column.RELATIVE_VALUE_CHANGE].apply(
+                self._locale.percentage_str
+            )
         )
 
         if any(data[id.Column.VALUE] != 0):
             yearly_data[Column.VALUE_CHANGE_NEGATIVE_STRING] = (
-                yearly_data[Column.VALUE_CHANGE_NEGATIVE].apply(self._locale.currency_str)
+                yearly_data[Column.VALUE_CHANGE_NEGATIVE].apply(
+                    self._locale.currency_str
+                )
                 + " / "
                 + yearly_data[Column.RELATIVE_VALUE_CHANGE].apply(
                     self._locale.percentage_str
@@ -231,7 +237,9 @@ class Graphing:
                 marker=dict(color="rgba(0, 255, 0, 0.7)"),
                 width=bar_width,
                 hovertemplate=hovertemplate,
-                customdata=np.transpose(yearly_data[Column.VALUE_CHANGE_POSITIVE_STRING]),
+                customdata=np.transpose(
+                    yearly_data[Column.VALUE_CHANGE_POSITIVE_STRING]
+                ),
             )
         )
         fig.add_trace(
@@ -241,7 +249,9 @@ class Graphing:
                 marker=dict(color="rgba(255, 0, 0, 0.7)"),
                 width=bar_width,
                 hovertemplate=hovertemplate,
-                customdata=np.transpose(yearly_data[Column.VALUE_CHANGE_NEGATIVE_STRING]),
+                customdata=np.transpose(
+                    yearly_data[Column.VALUE_CHANGE_NEGATIVE_STRING]
+                ),
             )
         )
 

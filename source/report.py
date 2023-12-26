@@ -110,7 +110,9 @@ class Report:
             tabs.append(html.Tab(html.Label(group), content))
 
         if len(groups) > 1:
-            content = self._create_historical_data_view(self._dataset.assets)
+            content = self._create_historical_data_view(
+                self._dataset.assets, name="Total"
+            )
             tabs.append(html.Tab(html.Label("<i>Total</i>"), content, checked=True))
 
         self._report.append(html.TabContainer(tabs))
@@ -149,23 +151,6 @@ class Report:
 
         return output
 
-        if len(data) > 1:
-            yearly_figure = plot_yearly_asset_data(data).to_html(
-                full_html=False, include_plotlyjs=True
-            )
-            historical_figure = plot_historical_asset_data(data).to_html(
-                full_html=False, include_plotlyjs=True
-            )
-            figures = html.Columns(
-                [
-                    html.Column(width=30, content=yearly_figure),
-                    html.Column(content=historical_figure),
-                ]
-            )
-            output += f"{figures}"
-
-        return output
-
     def _create_historical_data_view_header(
         self, assets: pd.DataFrame, name: str = None
     ) -> str:
@@ -183,7 +168,7 @@ class Report:
 
             info = (
                 first_row[id.Attribute.INFO]
-                if pd.notna(first_row[id.Attribute.INFO])
+                if (first_row[id.Attribute.INFO] != dataset.unassigned)
                 else ""
             )
             return html.Columns(
@@ -197,6 +182,8 @@ class Report:
 
     def _create_historical_data_view_statistics(self, assets: pd.DataFrame) -> str:
         historical_data = self._dataset.get_historical_data_sum(assets)
+        last_row = historical_data.iloc[-1]
+        last_nonzero_row = historical_data[historical_data[id.Column.PERIOD] != 0].iloc[-1]
         statistics = []
 
         if any(historical_data[id.Column.VALUE] != 0):
@@ -208,7 +195,7 @@ class Report:
                     "Value",
                     html.Value(
                         self._locale.currency_str(
-                            historical_data.iloc[-1][id.Column.VALUE]
+                            last_row[id.Column.VALUE]
                         ),
                         valuechange=html.ValueChange(
                             self._locale.currency_str(value_change.daily),
@@ -230,7 +217,7 @@ class Report:
                     "Price",
                     html.Value(
                         self._locale.currency_str(
-                            historical_data.iloc[-1][id.Column.PRICE]
+                            last_row[id.Column.PRICE]
                         ),
                         valuechange=html.ValueChange(
                             self._locale.currency_str(value_change.daily),
@@ -242,7 +229,7 @@ class Report:
         # don't display Funds invested, if asset was sold
         if not (
             any(historical_data[id.Column.VALUE] != 0)
-            and (historical_data.iloc[-1][id.Column.VALUE] == 0)
+            and (last_row[id.Column.VALUE] == 0)
         ):
             value_change = self._dataset.get_value_change(
                 historical_data[id.Column.NET_INVESTMENT]
@@ -252,7 +239,7 @@ class Report:
                     "Funds invested",
                     html.Value(
                         self._locale.currency_str(
-                            historical_data.iloc[-1][id.Column.NET_INVESTMENT]
+                            last_row[id.Column.NET_INVESTMENT]
                         ),
                         valuechange=html.ValueChange(
                             self._locale.currency_str(value_change.daily),
@@ -261,7 +248,7 @@ class Report:
                     ),
                 )
             )
-        if historical_data.iloc[-1][id.Column.NET_RETURN] != 0:
+        if last_nonzero_row[id.Column.NET_RETURN] != 0:
             value_change = self._dataset.get_value_change(
                 historical_data[id.Column.NET_RETURN]
             )
@@ -270,7 +257,7 @@ class Report:
                     "Return received",
                     html.Value(
                         self._locale.currency_str(
-                            historical_data.iloc[-1][id.Column.NET_RETURN]
+                            last_nonzero_row[id.Column.NET_RETURN]
                         ),
                         valuechange=html.ValueChange(
                             self._locale.currency_str(value_change.daily),
@@ -287,7 +274,7 @@ class Report:
                 "Net profit",
                 html.Value(
                     self._locale.currency_str(
-                        historical_data.iloc[-1][id.Column.NET_PROFIT]
+                        last_nonzero_row[id.Column.NET_PROFIT]
                     ),
                     valuechange=html.ValueChange(
                         self._locale.currency_str(value_change.daily),
@@ -304,7 +291,7 @@ class Report:
                 "Relative net profit",
                 html.Value(
                     self._locale.percentage_str(
-                        historical_data.iloc[-1][id.Column.RELATIVE_NET_PROFIT]
+                        last_nonzero_row[id.Column.RELATIVE_NET_PROFIT]
                     ),
                     valuechange=html.ValueChange(
                         self._locale.percentage_str(value_change.daily),
