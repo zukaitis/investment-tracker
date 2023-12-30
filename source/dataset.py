@@ -36,12 +36,12 @@ class Dataset:
         self._append_asset_attributes(filedict)
 
         last_id = self._assets.index[-1]
-        # try:
-        self._append_historical_data(filedict["data"], identifier=last_id)
-        # except Exception as error:
-        #     # remove attribute if something went wrong
-        #     self._assets.drop(last_id, inplace=True)
-        #     raise ValueError(error) from error
+        try:
+            self._append_historical_data(filedict["data"], identifier=last_id)
+        except Exception as error:
+            # remove attribute if something went wrong
+            self._assets.drop(last_id, inplace=True)
+            raise ValueError(error) from error
 
     def get_historical_data_sum(
         self, assets: typing.Union[list, pd.DataFrame]
@@ -82,7 +82,7 @@ class Dataset:
 
     def get_value_change(self, historical_data: pd.Series) -> ValueChange:
         if len(historical_data) < 2:  # can't have value changes with 1 or 0 values
-            return ValueChange()
+            return Dataset.ValueChange()
 
         value_change = Dataset.ValueChange(daily=0, monthly=0)
 
@@ -221,9 +221,12 @@ class Dataset:
         if (new_entry.iloc[0][id.Attribute.INFO] == unassigned) and (
             new_entry.iloc[0][id.Attribute.SYMBOL] != unassigned
         ):
-            new_entry[id.Attribute.INFO] = self._yfinance.get_info(
-                new_entry.iloc[0][id.Attribute.SYMBOL]
-            )
+            try:
+                new_entry[id.Attribute.INFO] = self._yfinance.get_info(
+                    new_entry.iloc[0][id.Attribute.SYMBOL]
+                )
+            except Exception as error:
+                raise ValueError(f"Ticker {new_entry.iloc[0][id.Attribute.SYMBOL]} was not found in yfinance") from error
 
         try:
             # check for duplicate IDs is enabled with verify_integrity
