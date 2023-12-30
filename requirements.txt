@@ -1,7 +1,7 @@
 setuptools == 65.5.0
 Babel == 2.11.0
 dominate == 2.7.0
-numpy == 1.21.5
+numpy == 1.26.2
 pandas == 2.1.4
 plotly == 5.18.0
 yfinance == 0.2.33
