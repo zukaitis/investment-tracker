@@ -71,10 +71,6 @@ p {
     -webkit-box-orient: vertical;
 }
 
-span {
-    font-size: 1.2em;
-}
-
 .tab_container {
     width: 98%;
     margin: 0 auto;
@@ -91,6 +87,7 @@ input, section {
 
 .tab_label {
     font-weight: 700;
+    font-size: 1.2em;
     display: block;
     float: left;
     width: 20%;
