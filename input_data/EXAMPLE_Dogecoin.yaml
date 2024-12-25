@@ -3,6 +3,7 @@ name: Dogecoin
 symbol: DOGE-USD
 account: Some crypto exchange site
 group: Cryptocurrency
+display_price: True
 data:
   - { date: "May 5, 2021", investment: +50, amount: 75.75756 }
   - { date: "May 8, 2021", investment: +50, amount: 151.51515 }
