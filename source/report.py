@@ -1,4 +1,5 @@
 import datetime
+import logging
 import numpy as np
 import pandas as pd
 
@@ -7,6 +8,7 @@ from source import dataset_identification as id
 from source import graphing
 from source import html
 from source import locale
+from source import log
 from source import settings
 
 _colors_light = dict(
@@ -44,6 +46,7 @@ class Report:
         self._append_header()
         # self._append_overall_data_tabs()
         self._append_historical_data_tabs()
+        self._append_log()
         self._append_footer()
 
     def write_to_file(self, filename: str):
@@ -117,6 +120,18 @@ class Report:
 
         self._report.append(html.TabContainer(tabs))
 
+    def _append_log(self):
+        if len(log.get().records) > 0:
+            label = "Log"
+            if log.get().error_count > 0:
+                label += '&nbsp;&nbsp;' + html.TextBox(f'{log.get().error_count}', "red")
+            if log.get().warning_count > 0:
+                label += '&nbsp;&nbsp;' + html.TextBox(f'{log.get().warning_count}', "orange")
+            content = "<br>".join(log.get().records)
+            self._report.append(
+                html.Container(html.Accordion(html.Heading2(label), content))
+            )
+
     def _append_footer(self):
         self._report.append(
             f'<p class="footer">Report generated on {self._locale.date_str(datetime.date.today())}, '
@@ -183,20 +198,22 @@ class Report:
     def _create_historical_data_view_statistics(self, assets: pd.DataFrame) -> str:
         historical_data = self._dataset.get_historical_data_sum(assets)
         last_row = historical_data.iloc[-1]
-        last_nonzero_row = historical_data[historical_data[id.Column.PERIOD] != 0].iloc[-1]
+        last_nonzero_row = historical_data[historical_data[id.Column.PERIOD] != 0].iloc[
+            -1
+        ]
         statistics = []
 
         if any(historical_data[id.Column.VALUE] != 0):
+            # Buying/selling assets shouldn't affect value change indicators
             value_change = self._dataset.get_value_change(
-                historical_data[id.Column.VALUE] - historical_data[id.Column.NET_INVESTMENT]
+                historical_data[id.Column.VALUE]
+                - historical_data[id.Column.NET_INVESTMENT]
             )
             statistics.append(
                 html.Label(
                     "Value",
                     html.Value(
-                        self._locale.currency_str(
-                            last_row[id.Column.VALUE]
-                        ),
+                        self._locale.currency_str(last_row[id.Column.VALUE]),
                         valuechange=html.ValueChange(
                             self._locale.currency_str(value_change.daily),
                             self._locale.currency_str(value_change.monthly),
@@ -217,9 +234,7 @@ class Report:
                 html.Label(
                     "Funds invested",
                     html.Value(
-                        self._locale.currency_str(
-                            last_row[id.Column.NET_INVESTMENT]
-                        ),
+                        self._locale.currency_str(last_row[id.Column.NET_INVESTMENT]),
                         valuechange=html.ValueChange(
                             self._locale.currency_str(value_change.daily),
                             self._locale.currency_str(value_change.monthly),
@@ -240,9 +255,7 @@ class Report:
                 html.Label(
                     "Price",
                     html.Value(
-                        self._locale.currency_str(
-                            last_row[id.Column.PRICE]
-                        ),
+                        self._locale.currency_str(last_row[id.Column.PRICE]),
                         valuechange=html.ValueChange(
                             self._locale.currency_str(value_change.daily),
                             self._locale.currency_str(value_change.monthly),
@@ -277,9 +290,7 @@ class Report:
             html.Label(
                 "Net profit",
                 html.Value(
-                    self._locale.currency_str(
-                        last_nonzero_row[id.Column.NET_PROFIT]
-                    ),
+                    self._locale.currency_str(last_nonzero_row[id.Column.NET_PROFIT]),
                     valuechange=html.ValueChange(
                         self._locale.currency_str(value_change.daily),
                         self._locale.currency_str(value_change.monthly),

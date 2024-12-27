@@ -70,19 +70,19 @@ class Document:
 
 @dataclass
 class Tab:
-    label: str = None
-    content: str = None
+    label: str = ""
+    content: str = ""
     checked: bool = False
 
 
-tab_container_count = 0
+_tab_container_count = 0
 
 
 class TabContainer(_HtmlObject):
     def __init__(self, tab: typing.List[Tab]):
-        self._raw = '<div class="tab_container">'
-        global tab_container_count
-        self.container_index = tab_container_count
+        self._raw = '<div class="container">'
+        global _tab_container_count
+        self.container_index = _tab_container_count
         self.tab_count = len(tab)
         container_name = f"container{self.container_index}"
         width = 100 / self.tab_count
@@ -93,24 +93,47 @@ class TabContainer(_HtmlObject):
             self._raw += (
                 f'<label class="tab_label" style="width:{width:.2f}%" for="{tab_name}">'
             )
-            if tab[i].label != None:
-                self._raw += str(tab[i].label)
+            self._raw += str(tab[i].label)
             self._raw += "</label>"
 
         for i in range(self.tab_count):
             id = f"{container_name}_content{i}"
             self._raw += f'<section id="{id}" class="tab-content">'
-            if tab[i].content != None:
-                self._raw += str(tab[i].content)
+            self._raw += str(tab[i].content)
             self._raw += "</section>"
 
         self._raw += "</div>"
-        tab_container_count += 1
+        _tab_container_count += 1
 
+
+class Container(_HtmlObject):
+    def __init__(self, content: str):
+        self._raw = '<div class="container">'
+        self._raw += content
+        self._raw += "</div>"
+
+
+class Accordion(_HtmlObject):
+    _accordion_count = 0
+
+    def __init__(self, label: str, content: str, open: bool = False):
+        self.accordion_index = Accordion._accordion_count
+        Accordion._accordion_count += 1
+        self._raw = '<div class="accordion">'
+        self._raw += f'<input type="checkbox" id="accordion{self.accordion_index}">'
+        self._raw += f'<label class="accordion-label" for="accordion{self.accordion_index}">{label}</label>'
+        self._raw += f'<div class="accordion-content">'
+        self._raw += content
+        self._raw += "</div>" * 2
+
+
+class TextBox(_HtmlObject):
+    def __init__(self, content: str, color: str = 'var(--text_color)'):
+        self._raw = f'<span style="background:{color};color:var(--tab_background_color);border-radius:0.25em;">&nbsp;{content}&nbsp;</span>'
 
 @dataclass
 class Column:
-    content: str = None
+    content: str = ""
     width: float = None
 
 
@@ -120,8 +143,7 @@ class Columns(_HtmlObject):
         column = self._fill_width_fields(column)
         for c in column:
             self._raw += f'<div class="column" style="width:{c.width:.1f}%">'
-            if c.content != None:
-                self._raw += str(c.content)
+            self._raw += str(c.content)
             self._raw += "</div>"
         self._raw += "</div>"
 

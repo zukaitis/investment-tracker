@@ -23,8 +23,8 @@ class Main:
         self._read_settings()
         self._read_asset_data()
 
-        print(self.dataset.assets)
-        self.dataset.get_historical_data_sum(self.dataset.assets).to_csv("out.csv")
+        # print(self.dataset.assets)
+        # self.dataset.get_historical_data_sum(self.dataset.assets).to_csv("out.csv")
 
         log.info("Generating report")
         self.report = report.Report(self.dataset, self.settings)
@@ -72,14 +72,19 @@ class Main:
                 if ("data" not in input) and (any([s in input for s in self.settings])):
                     log.info(f"Reading setting file {entry.name}")
                     for s in input:
-                        setattr(self.settings, s, input[s])
+                        try:
+                            setattr(self.settings, s, input[s])
+                        except Exception as exception:
+                            log.warning(str(exception), entry.name)
                     if settings_found == SettingsFound.YES:
-                        log.warning("Multiple settings files detected, expect trouble")
+                        log.warning(f'Multiple settings files detected, expect trouble', entry.name)
                         settings_found = (
                             SettingsFound.WARNED
                         )  # three states, so error would only pop once
                     elif settings_found == SettingsFound.NO:
                         settings_found = SettingsFound.YES
+
+        log.set_level(self.settings.log_level)
 
     def _read_asset_data(self):
         for entry in os.scandir(self.arguments.input_dir):
@@ -99,7 +104,7 @@ class Main:
                     try:
                         self.dataset.append(datadict)
                     except ValueError as error:
-                        log.error(error)
+                        log.error(str(error), entry.name)
 
 
 if __name__ == "__main__":

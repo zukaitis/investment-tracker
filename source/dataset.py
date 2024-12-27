@@ -163,7 +163,7 @@ class Dataset:
         )
         groups.sort_values(by=id.Attribute.VALUE, ascending=False, inplace=True)
         if len(groups) > len(bright_colors):
-            log.error(
+            log.warning(
                 "Input data contains too many different groups. "
                 "Because of that, group colors will be reused"
             )
@@ -197,7 +197,7 @@ class Dataset:
         for a in expected_attributes.values():
             if (a in filedict) and (not isinstance(filedict[a], str)):
                 log.warning(
-                    f'Attribute "{a}" is of wrong type. Attribute type should be string'
+                    f'Attribute "{a}" is of wrong type. Attribute type should be string', filedict["filename"]
                 )
                 filedict.pop(a)
 
@@ -226,7 +226,9 @@ class Dataset:
                     new_entry.iloc[0][id.Attribute.SYMBOL]
                 )
             except Exception as error:
-                raise ValueError(f"Ticker {new_entry.iloc[0][id.Attribute.SYMBOL]} was not found in yfinance") from error
+                raise ValueError(
+                    f'Ticker "{new_entry.iloc[0][id.Attribute.SYMBOL]}" was not found in yfinance'
+                ) from error
 
         try:
             # check for duplicate IDs is enabled with verify_integrity
@@ -247,7 +249,7 @@ class Dataset:
         if "date" not in new_entry.columns:
             raise ValueError("Not a single date found in file")
 
-        new_entry = self._convert_historical_data(new_entry)
+        new_entry = self._convert_historical_data(new_entry, self._assets.at[identifier, id.Attribute.FILENAME])
         if len(new_entry) == 0:
             raise ValueError("No data left in file after filtering")
 
@@ -270,7 +272,7 @@ class Dataset:
     def _contains_non_zero_values(self, column: pd.Series) -> bool:
         return any((column.values != 0) & (pd.notna(column.values)))
 
-    def _convert_historical_data(self, input_data: pd.DataFrame) -> pd.DataFrame:
+    def _convert_historical_data(self, input_data: pd.DataFrame, filename: str = None) -> pd.DataFrame:
         @dataclasses.dataclass()
         class InputColumn:
             name: str
@@ -306,12 +308,12 @@ class Dataset:
         data = data[data[id.Index.DATE].notnull()]  # remove rows without a date
         data[id.Index.DATE] = pd.to_datetime(data[id.Index.DATE], errors="coerce")
         if any(data[id.Index.DATE].isnull()):
-            log.warning("Unrecognized dates found in data")
+            log.warning("Unrecognized dates found in data", filename)
             data = data[
                 data[id.Index.DATE].notnull()
             ]  # remove rows where date was not converted
         if any(data[id.Index.DATE] > datetime.datetime.now()):
-            log.warning("Future dates found in data, they will be ignored")
+            log.warning("Future dates found in data, they will be ignored", filename)
             data = data[data[id.Index.DATE] <= datetime.datetime.now()]
 
         # filter out unrecognized, negative, and too high values
@@ -324,13 +326,13 @@ class Dataset:
             column_name_italic = log.italic(expected_columns[col].name)
             unrecognized = data[col].isnull() & original_data[col].notnull()
             if any(unrecognized):
-                log.warning(f"Unrecognized data found in {column_name_italic} column")
+                log.warning(f"Unrecognized data found in {column_name_italic} column", filename)
                 data = data[~unrecognized]
                 original_data = original_data[~unrecognized]
             if expected_columns[col].non_negative:
                 negative = data[col] < 0
                 if any(negative):
-                    log.warning(f"Negative values found in {column_name_italic} column")
+                    log.warning(f"Negative values found in {column_name_italic} column", filename)
                     data = data[~negative]
                     original_data = original_data[~negative]
             if expected_columns[col].max_value is not None:
@@ -339,7 +341,7 @@ class Dataset:
                     log.warning(
                         f"Too high values found in {column_name_italic} column. "
                         "Values in this column should not exceed "
-                        f"{expected_columns[col].max_value}"
+                        f"{expected_columns[col].max_value}", filename
                     )
                     data = data[~too_high]
                     original_data = original_data[~too_high]

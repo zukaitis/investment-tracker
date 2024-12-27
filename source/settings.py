@@ -1,7 +1,8 @@
 import babel
-import yfinance as yf
+import logging
 import pandas as pd
 import pytz
+import yfinance as yf
 
 from source import log
 
@@ -73,6 +74,19 @@ class _Name(_Setting):
         self._value = f"{value}'s"
 
 
+class _LogLevel(_Setting):
+
+
+    def __init__(self):
+        self._value = logging.WARNING  # default
+        self.allowed = self._level_map.keys
+        self.description = "Selects log level for the report"
+
+    @_Setting.value.setter
+    def value(self, value: str):
+        self._value = _level_map[value]
+
+
 class Settings:
     owner = _Name(
         default="Your",
@@ -84,6 +98,11 @@ class Settings:
     locale = _Locale(
         default="en_US_POSIX",
         description="Locale, which determines, how numbers are displayed",
+    )
+    log_level = _Setting(
+        default="warning",
+        description="Sets log level for the report",
+        allowed=["critical", "fatal", "error", "warning", "warn", "info", "debug"],
     )
     autofill_price_mark = _Setting(
         default="Close",
@@ -113,15 +132,15 @@ class Settings:
 
     def __setattr__(self, name, value):
         if name not in self:
-            log.warning(f'No such setting: "{name}"')
+            raise ValueError(f'No such setting: "{name}"')
         else:
             try:
                 self.__dict__[name].value = value
-            except ValueError:
+            except Exception as error:
                 message = f'Unrecognized {name.replace("_", " ")}: "{value}"'
                 if self.__dict__[name].allowed is not None:
                     message += f" Allowed values: {self.__dict__[name].allowed}"
-                log.warning(message)
+                raise ValueError(message) from error
 
     def __getattribute__(self, name):
         if ("__dict__" == name) or callable(super().__getattribute__(name)):

@@ -1,7 +1,7 @@
 import datetime
 import yfinance as yf
 import pandas as pd
-import supress
+import contextlib
 
 from source import log
 from source import settings
@@ -16,13 +16,13 @@ class YfinanceWrapper:
         self, symbol: str, start_date: datetime.datetime
     ) -> pd.DataFrame:
         ticker = yf.Ticker(symbol)
-        with supress.supressed():
+        with contextlib.suppress(Exception):
             fine = ticker.history(period="5d", interval="60m")
         coarse_end_date = None
         if not fine.empty:
             fine.index = fine.index.tz_convert(self.settings.timezone).tz_localize(None)
             coarse_end_date = fine.index[0].date()
-        with supress.supressed():
+        with contextlib.suppress(Exception):
             coarse = ticker.history(
                 start=start_date, end=coarse_end_date, interval="1d"
             )
@@ -50,7 +50,7 @@ class YfinanceWrapper:
                 data["Dividends"] *= currency_rate[self.settings.autofill_price_mark]
         else:
             log.warning(
-                f"Ticker currency info is missing. "
+                f"Currency info for ticker {symbol} is missing. "
                 f"Assuming, that ticker currency matches input currency ({self.settings.currency})"
             )
 

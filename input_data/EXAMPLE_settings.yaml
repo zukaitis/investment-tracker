@@ -4,6 +4,7 @@ owner: Example
 currency: USD
 locale: en_US
 theme: auto
+log_level: "info"
 autofill_price_mark: Random1~  # existing setting with non-existant value
 
 # non-existant settings don't crash the script

@@ -8,11 +8,11 @@ info: >
   It's created to display, how splitting time data into periods work. Notice, that current stats
   are displayed for the last period only, but not the whole history of the asset.
 data:
-  - { date: 2017-07-19, investment: +350, amount: 7 }
-  - { date: 2018-01-09, investment: -325, amount: 0 }
-  - { date: 2019-06-07, investment: +416, amount: 6.5 }
-  - { date: 2019-11-29, investment: -429, amount: 0 }
-  - { date: 2020-08-28, investment: +444, amount: 1 }
-  - { date: 2020-11-06, investment: -428, amount: 0 }
-  - { date: 2021-02-16, investment: +200, amount: 0.25 }
+  - { date: 2017-07-19, investment: +350, amount: 15 }
+  - { date: 2018-01-09, investment: -345, amount: 0 }
+  - { date: 2019-06-07, investment: +416, amount: 34 }
+  - { date: 2019-11-29, investment: -716, amount: 0 }
+  - { date: 2020-08-28, investment: +444, amount: 2.7 }
+  - { date: 2020-11-06, investment: -376, amount: 0 }
+  - { date: 2021-02-16, investment: +200, amount: 0.74 }
 
