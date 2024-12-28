@@ -22,8 +22,8 @@ class Dataset:
         self._assets = pd.DataFrame(columns=list(id.Attribute))
         self._attribute_data_calculated = False
         self.historical_data = {}
-        self.latest_date = None
-        self.earliest_date = None
+        self._latest_date = None
+        self._earliest_date = None
 
     @property
     def assets(self) -> pd.DataFrame:
@@ -31,6 +31,20 @@ class Dataset:
             self._calculate_attribute_data()
             self._attribute_data_calculated = True
         return self._assets
+
+    @property
+    def latest_date(self):
+        if not self._attribute_data_calculated:
+            self._calculate_attribute_data()
+            self._attribute_data_calculated = True
+        return self._latest_date
+
+    @property
+    def earliest_date(self):
+        if not self._attribute_data_calculated:
+            self._calculate_attribute_data()
+            self._attribute_data_calculated = True
+        return self._earliest_date
 
     def append(self, filedict: dict):
         self._append_asset_attributes(filedict)
@@ -120,8 +134,8 @@ class Dataset:
         return value_change
 
     def _calculate_attribute_data(self):
-        self.latest_date = max([max(a.index) for _, a in self.historical_data.items()])
-        self.earliest_date = min(
+        self._latest_date = max([max(a.index) for _, a in self.historical_data.items()])
+        self._earliest_date = min(
             [min(a.index) for _, a in self.historical_data.items()]
         )
 
@@ -139,7 +153,7 @@ class Dataset:
                 self._assets.at[identifier, id.Attribute.ACTIVE] = max(
                     self.historical_data[identifier].index
                 ) < (
-                    self.latest_date
+                    self._latest_date
                     - pd.tseries.frequencies.to_offset(self._settings.relevance_period)
                 )
 
