@@ -12,7 +12,7 @@ from source import log
 from source import settings
 from source import yfinance_wrapper
 
-unassigned = "___"
+unassigned = '___'
 
 
 class Dataset:
@@ -51,7 +51,7 @@ class Dataset:
 
         last_id = self._assets.index[-1]
         try:
-            self._append_historical_data(filedict["data"], identifier=last_id)
+            self._append_historical_data(filedict['data'], identifier=last_id)
         except Exception as error:
             # remove attribute if something went wrong
             self._assets.drop(last_id, inplace=True)
@@ -63,11 +63,11 @@ class Dataset:
         if isinstance(assets, pd.DataFrame):
             assets = list(assets.index)
         if not isinstance(assets, list):
-            raise TypeError("Parameter should be either a list or DataFrame")
+            raise TypeError('Parameter should be either a list or DataFrame')
         if len(assets) == 1:
             return self.historical_data[assets[0]]
 
-        all_dates = pd.Index([])
+        all_dates = pd.Index([]).astype('datetime64[ns]')
         for a in assets:
             all_dates = (
                 all_dates.append(self.historical_data[a].index).unique().sort_values()
@@ -81,13 +81,13 @@ class Dataset:
             historical[[id.Column.PRICE, id.Column.AMOUNT, id.Column.COMMENT]] = np.nan
             historical = self._interpolate_historical_data(historical)
             with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
+                warnings.simplefilter('ignore')
                 result = result.add(historical)
 
         return self._interpolate_historical_data(result)
 
     def get_monthly_data(self, column: id.Column) -> pd.DataFrame:
-        print("yo")
+        print('yo')
 
     @dataclasses.dataclass
     class ValueChange:
@@ -102,7 +102,7 @@ class Dataset:
 
         delta = pd.tseries.frequencies.to_offset(self._settings.value_change_span)
         day_ago_index = historical_data.index.get_indexer(
-            [historical_data.index[-1] - datetime.timedelta(days=1)], method="nearest"
+            [historical_data.index[-1] - datetime.timedelta(days=1)], method='nearest'
         )[0]
         # check how recent the data is
         if (
@@ -113,22 +113,22 @@ class Dataset:
             )
 
         data = historical_data.to_frame()
-        data["year"] = data.index.year
-        data["month"] = data.index.month
-        monthly = data.groupby(["year", "month"]).last().reset_index()
-        monthly.columns = ["year", "month", "value"]
-        monthly["m"] = (
-            monthly["year"] * 12 + monthly["month"]
+        data['year'] = data.index.year
+        data['month'] = data.index.month
+        monthly = data.groupby(['year', 'month']).last().reset_index()
+        monthly.columns = ['year', 'month', 'value']
+        monthly['m'] = (
+            monthly['year'] * 12 + monthly['month']
         )  # month number for easier operations
         latest_month = self.latest_date.year * 12 + self.latest_date.month
 
         if (
-            (monthly.loc[monthly.index[-1], "m"] - monthly.loc[monthly.index[-2], "m"])
+            (monthly.loc[monthly.index[-1], 'm'] - monthly.loc[monthly.index[-2], 'm'])
             == 1
-        ) and (latest_month - monthly.loc[monthly.index[-1], "m"] <= 1):
+        ) and (latest_month - monthly.loc[monthly.index[-1], 'm'] <= 1):
             value_change.monthly = (
-                monthly.loc[monthly.index[-1], "value"]
-                - monthly.loc[monthly.index[-2], "value"]
+                monthly.loc[monthly.index[-1], 'value']
+                - monthly.loc[monthly.index[-2], 'value']
             )
 
         return value_change
@@ -173,13 +173,13 @@ class Dataset:
         bright_colors = px.colors.qualitative.Set1
         pastel_colors = px.colors.qualitative.Pastel1
         groups = self._assets.groupby(id.Attribute.GROUP).agg(
-            {id.Attribute.VALUE: "sum"}
+            {id.Attribute.VALUE: 'sum'}
         )
         groups.sort_values(by=id.Attribute.VALUE, ascending=False, inplace=True)
         if len(groups) > len(bright_colors):
             log.warning(
-                "Input data contains too many different groups. "
-                "Because of that, group colors will be reused"
+                'Input data contains too many different groups. '
+                'Because of that, group colors will be reused'
             )
 
         color_index = 0
@@ -188,7 +188,7 @@ class Dataset:
             bright_color = bright_colors[color_index]
             pastel_color = pastel_colors[color_index]
             colors = px.colors.n_colors(
-                bright_color, pastel_color, max(asset_count, 4), colortype="rgb"
+                bright_color, pastel_color, max(asset_count, 4), colortype='rgb'
             )
             colors = colors[:asset_count]
             self._assets.loc[
@@ -200,25 +200,25 @@ class Dataset:
 
     def _append_asset_attributes(self, filedict: dict):
         expected_attributes = {
-            id.Attribute.NAME: "name",
-            id.Attribute.SYMBOL: "symbol",
-            id.Attribute.GROUP: "group",
-            id.Attribute.ACCOUNT: "account",
-            id.Attribute.INFO: "info",
-            id.Attribute.FILENAME: "filename",
+            id.Attribute.NAME: 'name',
+            id.Attribute.SYMBOL: 'symbol',
+            id.Attribute.GROUP: 'group',
+            id.Attribute.ACCOUNT: 'account',
+            id.Attribute.INFO: 'info',
+            id.Attribute.FILENAME: 'filename',
         }
 
         for a in expected_attributes.values():
             if (a in filedict) and (not isinstance(filedict[a], str)):
                 log.warning(
-                    f'Attribute "{a}" is of wrong type. Attribute type should be string', filedict["filename"]
+                    f'Attribute "{a}" is of wrong type. Attribute type should be string', filedict['filename']
                 )
                 filedict.pop(a)
 
-        identifier = ">".join(
+        identifier = '>'.join(
             [
                 filedict[a]
-                for a in ["name", "symbol", "account", "group"]
+                for a in ['name', 'symbol', 'account', 'group']
                 if a in filedict
             ]
         )
@@ -230,7 +230,7 @@ class Dataset:
             index=[identifier],
         )
         new_entry[id.Attribute.DISPLAY_PRICE] = (
-            bool(filedict["display_price"]) if ("display_price" in filedict) else False
+            bool(filedict['display_price']) if ('display_price' in filedict) else False
         )
         if (new_entry.iloc[0][id.Attribute.INFO] == unassigned) and (
             new_entry.iloc[0][id.Attribute.SYMBOL] != unassigned
@@ -249,23 +249,23 @@ class Dataset:
             self._assets = pd.concat([self._assets, new_entry], verify_integrity=True)
         except ValueError as error:
             raise ValueError(
-                "Identical assets found in files "
-                f"{log.italic(self._assets.at[identifier, id.Attribute.FILENAME])} and "
+                'Identical assets found in files '
+                f'{log.italic(self._assets.at[identifier, id.Attribute.FILENAME])} and '
                 f'{log.italic(filedict["filename"])}. Data from latter file is ignored'
             ) from error
 
     def _append_historical_data(self, data: list, identifier: str):
         if not isinstance(data, list):
-            raise ValueError("Data should be structured as a list")
+            raise ValueError('Data should be structured as a list')
 
         new_entry = pd.DataFrame(data)
 
-        if "date" not in new_entry.columns:
-            raise ValueError("Not a single date found in file")
+        if 'date' not in new_entry.columns:
+            raise ValueError('Not a single date found in file')
 
         new_entry = self._convert_historical_data(new_entry, self._assets.at[identifier, id.Attribute.FILENAME])
         if len(new_entry) == 0:
-            raise ValueError("No data left in file after filtering")
+            raise ValueError('No data left in file after filtering')
 
         symbol = self._assets.at[identifier, id.Attribute.SYMBOL]
         if (
@@ -273,7 +273,7 @@ class Dataset:
             and id.Column.VALUE not in new_entry.columns
             and id.Column.PRICE not in new_entry.columns
         ):
-            log.info(f"Fetching yfinance data for {log.italic(symbol)}")
+            log.info(f'Fetching yfinance data for {log.italic(symbol)}')
             yfdata = self._yfinance.get_historical_data(
                 symbol, min(new_entry.index) - datetime.timedelta(days=7)
             )
@@ -294,14 +294,14 @@ class Dataset:
             max_value: float = None
 
         expected_columns = {
-            id.Column.INVESTMENT: InputColumn("investment"),
-            id.Column.RETURN: InputColumn("return", non_negative=True),
+            id.Column.INVESTMENT: InputColumn('investment'),
+            id.Column.RETURN: InputColumn('return', non_negative=True),
             id.Column.RETURN_TAX: InputColumn(
-                "return_tax", non_negative=True, max_value=1.0
+                'return_tax', non_negative=True, max_value=1.0
             ),
-            id.Column.PRICE: InputColumn("price", non_negative=True),
-            id.Column.AMOUNT: InputColumn("amount", non_negative=True),
-            id.Column.VALUE: InputColumn("value", non_negative=True),
+            id.Column.PRICE: InputColumn('price', non_negative=True),
+            id.Column.AMOUNT: InputColumn('amount', non_negative=True),
+            id.Column.VALUE: InputColumn('value', non_negative=True),
         }
 
         data = input_data.copy()
@@ -313,49 +313,49 @@ class Dataset:
             },
             inplace=True,
         )
-        data.rename(columns={"date": id.Index.DATE}, inplace=True)
-        if "comment" in data.columns:
-            data.rename(columns={"comment": id.Column.COMMENT}, inplace=True)
+        data.rename(columns={'date': id.Index.DATE}, inplace=True)
+        if 'comment' in data.columns:
+            data.rename(columns={'comment': id.Column.COMMENT}, inplace=True)
         else:
             data[id.Column.COMMENT] = np.nan
 
         data = data[data[id.Index.DATE].notnull()]  # remove rows without a date
-        data[id.Index.DATE] = pd.to_datetime(data[id.Index.DATE], errors="coerce")
+        data[id.Index.DATE] = pd.to_datetime(data[id.Index.DATE], errors='coerce')
         if any(data[id.Index.DATE].isnull()):
-            log.warning("Unrecognized dates found in data", filename)
+            log.warning('Unrecognized dates found in data', filename)
             data = data[
                 data[id.Index.DATE].notnull()
             ]  # remove rows where date was not converted
         if any(data[id.Index.DATE] > datetime.datetime.now()):
-            log.warning("Future dates found in data, they will be ignored", filename)
+            log.warning('Future dates found in data, they will be ignored', filename)
             data = data[data[id.Index.DATE] <= datetime.datetime.now()]
 
         # filter out unrecognized, negative, and too high values
         available_columns = [c for c in expected_columns if c in data.columns]
         original_data = data.copy()
         data[available_columns] = data[available_columns].apply(
-            pd.to_numeric, errors="coerce"
+            pd.to_numeric, errors='coerce'
         )
         for col in available_columns:
             column_name_italic = log.italic(expected_columns[col].name)
             unrecognized = data[col].isnull() & original_data[col].notnull()
             if any(unrecognized):
-                log.warning(f"Unrecognized data found in {column_name_italic} column", filename)
+                log.warning(f'Unrecognized data found in {column_name_italic} column', filename)
                 data = data[~unrecognized]
                 original_data = original_data[~unrecognized]
             if expected_columns[col].non_negative:
                 negative = data[col] < 0
                 if any(negative):
-                    log.warning(f"Negative values found in {column_name_italic} column", filename)
+                    log.warning(f'Negative values found in {column_name_italic} column', filename)
                     data = data[~negative]
                     original_data = original_data[~negative]
             if expected_columns[col].max_value is not None:
                 too_high = data[col] > expected_columns[col].max_value
                 if any(too_high):
                     log.warning(
-                        f"Too high values found in {column_name_italic} column. "
-                        "Values in this column should not exceed "
-                        f"{expected_columns[col].max_value}", filename
+                        f'Too high values found in {column_name_italic} column. '
+                        'Values in this column should not exceed '
+                        f'{expected_columns[col].max_value}', filename
                     )
                     data = data[~too_high]
                     original_data = original_data[~too_high]
@@ -365,19 +365,19 @@ class Dataset:
 
     def _interpolate_historical_data(self, input_data: pd.DataFrame) -> pd.DataFrame:
         interpolated_columns = {
-            id.Column.AMOUNT: "pad",
-            id.Column.PRICE: "pad",
+            id.Column.AMOUNT: 'pad',
+            id.Column.PRICE: 'pad',
             id.Column.INVESTMENT: None,
             id.Column.RETURN_PER_UNIT: None,
             id.Column.RETURN: None,
-            id.Column.RETURN_TAX: "pad",
+            id.Column.RETURN_TAX: 'pad',
         }
 
         data = input_data.copy()
         for col, method in interpolated_columns.items():
             if col not in data.columns:
                 data[col] = np.nan
-            if method == "pad":
+            if method == 'pad':
                 data[col] = data[col].ffill()
             data[col] = data[col].fillna(0.0)
 
@@ -389,7 +389,7 @@ class Dataset:
             data.loc[pd.isna(data[id.Column.VALUE]), id.Column.VALUE] = (
                 data[id.Column.AMOUNT] * data[id.Column.PRICE]
             )
-        data[id.Column.VALUE] = data[id.Column.VALUE].interpolate(method="linear")
+        data[id.Column.VALUE] = data[id.Column.VALUE].interpolate(method='linear')
         data[id.Column.VALUE] = data[id.Column.VALUE].fillna(0.0)
 
         data[id.Column.NET_SALE_PROFIT] = 0.0

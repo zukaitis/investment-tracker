@@ -71,7 +71,6 @@ class Report:
         tabs = []
 
         groups = self._list_by_value(self._dataset.assets, id.Attribute.GROUP)
-        print(groups)
         for group in groups:
             content = ''
             dividers_to_add = 0

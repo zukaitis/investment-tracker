@@ -41,7 +41,7 @@ class _Setting:
 
 class _Currency(_Setting):
     def _is_allowed(self, value) -> bool:
-        if len(yf.Ticker(f"{value}=X").history()) == 0:
+        if len(yf.Ticker(f'{value}=X').history()) == 0:
             return False
         return True
 
@@ -80,7 +80,7 @@ class _LogLevel(_Setting):
     def __init__(self):
         self._value = logging.WARNING  # default
         self.allowed = self._level_map.keys
-        self.description = "Selects log level for the report"
+        self.description = 'Selects log level for the report'
 
     @_Setting.value.setter
     def value(self, value: str):
@@ -89,42 +89,42 @@ class _LogLevel(_Setting):
 
 class Settings:
     owner = _Name(
-        default="Your",
-        description="Name of the portfolio owner, which will be displayed in the title",
+        default='Your',
+        description='Name of the portfolio owner, which will be displayed in the title',
     )
     currency = _Currency(
-        default="EUR", description="Currency, in which all the input data is specified"
+        default='EUR', description='Currency, in which all the input data is specified'
     )
     locale = _Locale(
-        default="en_US_POSIX",
-        description="Locale, which determines, how numbers are displayed",
+        default='en_US_POSIX',
+        description='Locale, which determines, how numbers are displayed',
     )
     log_level = _Setting(
-        default="warning",
-        description="Sets log level for the report",
-        allowed=["critical", "fatal", "error", "warning", "warn", "info", "debug"],
+        default='warning',
+        description='Sets log level for the report',
+        allowed=['critical', 'fatal', 'error', 'warning', 'warn', 'info', 'debug'],
     )
     autofill_price_mark = _Setting(
-        default="Close",
-        description="Selects, which value column to use, when fetching financial data",
-        allowed=["Open", "Close", "High", "Low"],
+        default='Close',
+        description='Selects, which value column to use, when fetching financial data',
+        allowed=['Open', 'Close', 'High', 'Low'],
     )
     theme = _Setting(
-        default="auto",
-        description="Color scheme to be used in the report",
-        allowed=["light", "dark", "auto"],
+        default='auto',
+        description='Color scheme to be used in the report',
+        allowed=['light', 'dark', 'auto'],
     )
     value_change_span = _Period(
-        default="2d",
-        description="Selects, how recent and frequent data entries have to be, "
-        "to display value change",
+        default='2d',
+        description='Selects, how recent and frequent data entries have to be, '
+        'to display value change',
     )
     relevance_period = _Period(
-        default="6M",
-        description="Selects, how recent and frequent data entries have to be, "
-        "for data be considered relevant",
+        default='6M',
+        description='Selects, how recent and frequent data entries have to be, '
+        'for data be considered relevant',
     )
-    timezone = _Timezone(default="UTC", description="Time zone, used in the report")
+    timezone = _Timezone(default='UTC', description='Time zone, used in the report')
 
     def __init__(self):
         for s in self:  # copy all class variables to instance
@@ -139,11 +139,11 @@ class Settings:
             except Exception as error:
                 message = f'Unrecognized {name.replace("_", " ")}: "{value}"'
                 if self.__dict__[name].allowed is not None:
-                    message += f" Allowed values: {self.__dict__[name].allowed}"
+                    message += f' Allowed values: {self.__dict__[name].allowed}'
                 raise ValueError(message) from error
 
     def __getattribute__(self, name):
-        if ("__dict__" == name) or callable(super().__getattribute__(name)):
+        if ('__dict__' == name) or callable(super().__getattribute__(name)):
             return super().__getattribute__(name)  # call from __iter__()
         return super().__getattribute__(name).value
 
@@ -151,7 +151,7 @@ class Settings:
         variables = [
             d
             for d in dir(Settings)
-            if not (d.startswith("_") or callable(getattr(Settings, d)))
+            if not (d.startswith('_') or callable(getattr(Settings, d)))
         ]
         return iter(variables)
 

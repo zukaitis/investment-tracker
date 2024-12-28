@@ -52,33 +52,33 @@ class Locale:
     def currency_tick_prefix(self) -> str:
         if (
             babel.numbers.Locale.parse(self._locale)
-            .currency_formats["standard"]
-            .pattern.startswith("¤")
+            .currency_formats['standard']
+            .pattern.startswith('¤')
         ):
             if (
                 babel.numbers.Locale.parse(self._locale)
-                .currency_formats["standard"]
-                .pattern.startswith("¤\xa0")
+                .currency_formats['standard']
+                .pattern.startswith('¤\xa0')
             ):
-                return f"{self.currency_symbol()} "  # add space after the symbol
-            return f"{self.currency_symbol()}"
+                return f'{self.currency_symbol()} '  # add space after the symbol
+            return f'{self.currency_symbol()}'
 
     def currency_tick_suffix(self) -> str:
         if (
             babel.numbers.Locale.parse(self._locale)
-            .currency_formats["standard"]
-            .pattern.endswith("¤")
+            .currency_formats['standard']
+            .pattern.endswith('¤')
         ):
             if (
                 babel.numbers.Locale.parse(self._locale)
-                .currency_formats["standard"]
-                .pattern.endswith("\xa0¤")
+                .currency_formats['standard']
+                .pattern.endswith('\xa0¤')
             ):
-                return f" {self.currency_symbol()}"  # add space before the symbol
-            return f"{self.currency_symbol()}"
+                return f' {self.currency_symbol()}'  # add space before the symbol
+            return f'{self.currency_symbol()}'
 
     def percentage_tick_suffix(self) -> str:
         string = percentage_str(777)  # checking generated string of random percentage
-        if string[-2] == " ":
-            return " %"
-        return "%"
+        if string[-2] == ' ':
+            return ' %'
+        return '%'

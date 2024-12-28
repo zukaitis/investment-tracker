@@ -26,28 +26,28 @@ class Main:
         # print(self.dataset.assets)
         # self.dataset.get_historical_data_sum(self.dataset.assets).to_csv("out.csv")
 
-        log.info("Generating report")
+        log.info('Generating report')
         self.report = report.Report(self.dataset, self.settings)
-        log.info("Writing to file")
-        self.report.write_to_file("report.html")
-        log.info("Completed successfully")
+        log.info('Writing to file')
+        self.report.write_to_file('report.html')
+        log.info('Completed successfully')
 
     def _parse_arguments(self):
         default_input_dir = (
-            f"{os.path.dirname(os.path.realpath(__file__))}{os.path.sep}input_data"
+            f'{os.path.dirname(os.path.realpath(__file__))}{os.path.sep}input_data'
         )
 
         parser = argparse.ArgumentParser()
         parser.add_argument(
-            "--input_dir",
-            "-i",
+            '--input_dir',
+            '-i',
             type=str,
             default=default_input_dir,
-            help="Directory, containing input files",
+            help='Directory, containing input files',
         )
         for s in self.settings:  # all settings are possible arguments
             parser.add_argument(
-                f"--{s}",
+                f'--{s}',
                 type=type(getattr(self.settings, s)),
                 help=self.settings.get_description(s),
                 choices=self.settings.get_allowed(s),
@@ -65,12 +65,12 @@ class Main:
 
         settings_found = SettingsFound.NO
         for entry in os.scandir(self.arguments.input_dir):
-            if entry.is_file() and entry.path.endswith((".yaml", ".yml")):
-                with open(entry, "r") as entry_file:
+            if entry.is_file() and entry.path.endswith(('.yaml', '.yml')):
+                with open(entry, 'r') as entry_file:
                     input = yaml.safe_load(entry_file)
                 # check if there are general settings in file
-                if ("data" not in input) and (any([s in input for s in self.settings])):
-                    log.info(f"Reading setting file {entry.name}")
+                if ('data' not in input) and (any([s in input for s in self.settings])):
+                    log.info(f'Reading setting file {entry.name}')
                     for s in input:
                         try:
                             setattr(self.settings, s, input[s])
@@ -88,17 +88,17 @@ class Main:
 
     def _read_asset_data(self):
         for entry in os.scandir(self.arguments.input_dir):
-            if entry.is_file() and entry.path.endswith((".yaml", ".yml")):
-                with open(entry, "r") as entry_file:
+            if entry.is_file() and entry.path.endswith(('.yaml', '.yml')):
+                with open(entry, 'r') as entry_file:
                     datadict = yaml.safe_load(entry_file)
                 # check that there are no general settings in file
-                if "data" in datadict:
-                    log.info(f"Reading asset data file {entry.name}")
-                    datadict["filename"] = entry.name
-                    if ("name" not in datadict) or (
-                        not isinstance(datadict["name"], str)
+                if 'data' in datadict:
+                    log.info(f'Reading asset data file {entry.name}')
+                    datadict['filename'] = entry.name
+                    if ('name' not in datadict) or (
+                        not isinstance(datadict['name'], str)
                     ):
-                        datadict["name"] = os.path.splitext(entry.name)[
+                        datadict['name'] = os.path.splitext(entry.name)[
                             0
                         ]  # remove extension
                     try:
@@ -107,6 +107,6 @@ class Main:
                         log.error(str(error), entry.name)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main = Main()
     main.run()
