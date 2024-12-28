@@ -4,8 +4,6 @@ on:
   schedule:
     - cron: '00 9 * * *'  # generate report everyday at 9:00 UTC
   push:
-    branches:
-      - master
   workflow_dispatch:
 
 jobs:
