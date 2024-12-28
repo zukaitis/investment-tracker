@@ -186,7 +186,7 @@ class ValueChange(_HtmlObject):
         symbol = '▾' if _is_negative(value_change) else '▴'
         color = _negative_color if _is_negative(value_change) else _positive_color
         self._raw += f'<span class="{css_class}" style="color:{color};">'
-        self._raw += f' {symbol}{value_change.replace('-', '')}</span>'
+        self._raw += f' {symbol}{value_change.replace("-", "")}</span>'
 
 
 class Value(_HtmlObject):
