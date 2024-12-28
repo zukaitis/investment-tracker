@@ -120,7 +120,7 @@ class Settings:
         'to display value change',
     )
     relevance_period = _Period(
-        default='6M',
+        default='6ME',
         description='Selects, how recent and frequent data entries have to be, '
         'for data be considered relevant',
     )

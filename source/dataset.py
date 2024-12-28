@@ -157,10 +157,10 @@ class Dataset:
                     - pd.tseries.frequencies.to_offset(self._settings.relevance_period)
                 )
 
-        self._assets[id.Attribute.GROUP].fillna(unassigned, inplace=True)
-        self._assets[id.Attribute.ACCOUNT].fillna(unassigned, inplace=True)
-        self._assets[id.Attribute.SYMBOL].fillna(unassigned, inplace=True)
-        self._assets[id.Attribute.YFINANCE_FETCH_SUCCESSFUL].fillna(False, inplace=True)
+        self._assets.fillna({id.Attribute.GROUP: unassigned}, inplace=True)
+        self._assets.fillna({id.Attribute.ACCOUNT: unassigned}, inplace=True)
+        self._assets.fillna({id.Attribute.SYMBOL: unassigned}, inplace=True)
+        self._assets.fillna({id.Attribute.YFINANCE_FETCH_SUCCESSFUL: False}, inplace=True)
         self._reassign_colors()
 
     def _reassign_colors(self):
