@@ -1,4 +1,5 @@
 import babel
+import datetime
 import logging
 import pandas as pd
 import pytz
@@ -124,7 +125,7 @@ class Settings:
         description='Selects, how recent and frequent data entries have to be, '
         'for data be considered relevant',
     )
-    timezone = _Timezone(default='UTC', description='Time zone, used in the report')
+    timezone = _Timezone(default=datetime.datetime.now().astimezone().tzname(), description='Time zone, used in the report')
 
     def __init__(self):
         for s in self:  # copy all class variables to instance

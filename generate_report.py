@@ -85,6 +85,7 @@ class Main:
                         settings_found = SettingsFound.YES
 
         log.set_level(self.settings.log_level)
+        log.set_timezone(self.settings.timezone)
 
     def _read_asset_data(self):
         for entry in os.scandir(self.arguments.input_dir):

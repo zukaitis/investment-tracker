@@ -4,6 +4,7 @@ owner: Example
 currency: USD
 locale: en_US
 theme: auto
+timezone: Europe/Madrid
 log_level: "info"
 autofill_price_mark: Random1~  # existing setting with non-existant value
 

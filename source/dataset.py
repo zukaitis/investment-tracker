@@ -145,6 +145,7 @@ class Dataset:
             ][id.Column.VALUE].iloc[-1]
 
             if any(self.historical_data[identifier][id.Column.VALUE] > 0):
+                # Asset is considered active, if it's current value is non-zero
                 self._assets.at[identifier, id.Attribute.ACTIVE] = (
                     self._assets.at[identifier, id.Attribute.VALUE] != 0
                 )
@@ -152,7 +153,7 @@ class Dataset:
                 # Tax "assets" are considered irrelevant, if they weren't updated for a certain amount of time
                 self._assets.at[identifier, id.Attribute.ACTIVE] = max(
                     self.historical_data[identifier].index
-                ) < (
+                ) > (
                     self._latest_date
                     - pd.tseries.frequencies.to_offset(self._settings.relevance_period)
                 )
