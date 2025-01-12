@@ -12,11 +12,7 @@ class Locale:
     def currency_str(self, value: float) -> str:
         if np.isnan(value) or np.isinf(value):
             return "?"
-        precision = 4
-        if abs(value) >= 0.50:
-            precision = 2
-        elif abs(value) >= 0.050:
-            precision = 3
+        precision = 2
         return babel.numbers.format_currency(
             round(value, precision),
             self._currency,
