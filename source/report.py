@@ -12,21 +12,21 @@ from source import log
 from source import settings
 
 _colors_light = dict(
-    background_color='#e5ecf6',
-    text_color='#555555',
-    tab_background_color='#ffffff',
-    tab_shadow_color='#f0f0f0',
-    checked_tab_indicator_color='#00ccee',
-    hover_tab_indicator_color='#c6fbff',
+    background_color="#e5ecf6",
+    text_color="#555555",
+    tab_background_color="#ffffff",
+    tab_shadow_color="#f0f0f0",
+    checked_tab_indicator_color="#00ccee",
+    hover_tab_indicator_color="#c6fbff",
 )
 
 _colors_dark = dict(
-    background_color='#283442',
-    text_color='#999999',
-    tab_background_color='#111111',
-    tab_shadow_color='#202020',
-    checked_tab_indicator_color='#00ccee',
-    hover_tab_indicator_color='#11363c',
+    background_color="#283442",
+    text_color="#999999",
+    tab_background_color="#111111",
+    tab_shadow_color="#202020",
+    checked_tab_indicator_color="#00ccee",
+    hover_tab_indicator_color="#11363c",
 )
 
 
@@ -37,42 +37,143 @@ class Report:
         self._locale = locale.Locale(
             locale=self._settings.locale, currency=self._settings.currency
         )
-        theme_colors = _colors_dark if settings.theme == 'dark' else _colors_light
+        theme_colors = _colors_dark if settings.theme == "dark" else _colors_light
         self._graphing = graphing.Graphing(self._dataset, self._settings, theme_colors)
 
-        self._title = f'{settings.owner} investment portfolio'
+        self._title = f"{settings.owner} investment portfolio"
         self._report = html.Document(title=self._title, css_variables=theme_colors)
 
         self._append_header()
-        # self._append_overall_data_tabs()
+        self._append_overall_data_tabs()
         self._append_historical_data_tabs()
         self._append_log()
         self._append_footer()
 
     def write_to_file(self, filename: str):
-        with open(filename, 'w') as f:
+        with open(filename, "w") as f:
             print(self._report, file=f)
 
     def _append_header(self):
-        self._report.append(f'<h1>{self._title}</h1>')
+        self._report.append(f"<h1>{self._title}</h1>")
         self._report.append(
-            f'<h3>Data from {self._locale.date_str(self._dataset.earliest_date)} to '
-            f'{self._locale.date_str(self._dataset.latest_date)}</h3>'
+            f"<h3>Data from {self._locale.date_str(self._dataset.earliest_date)} to "
+            f"{self._locale.date_str(self._dataset.latest_date)}</h3>"
         )
         self._report.append(
             html.Button(
-                image_initial='calendar_day.svg',
-                image_alternate='calendar_month.svg',
-                identifier='value_change_button',
+                image_initial="calendar_day.svg",
+                image_alternate="calendar_month.svg",
+                identifier="value_change_button",
             )
         )
+
+    def _append_overall_data_tabs(self):
+        tabs = [self._get_overall_value_tab()]
+        tabs.append(self._get_overall_funds_invested_tab())
+        tabs.append(self._get_overall_return_received_tab())
+        tabs.append(self._get_overall_net_profit_tab())
+        tabs.append(self._get_overall_relative_net_profit_tab())
+        self._report.append(html.TabContainer(tabs))
+
+    def _get_overall_value_tab(self) -> html.Tab:
+        historical_data = self._dataset.get_historical_data_sum(self._dataset.assets)
+        last_row = historical_data.iloc[-1]
+        # Buying/selling assets shouldn't affect value change indicators
+        value_change = self._dataset.get_value_change(
+            historical_data[id.Column.VALUE] - historical_data[id.Column.NET_INVESTMENT]
+        )
+
+        label = html.Label(
+            "Value",
+            html.Value(
+                self._locale.currency_str(last_row[id.Column.VALUE]),
+                valuechange=html.ValueChange(
+                    self._locale.currency_str(value_change.daily),
+                    self._locale.currency_str(value_change.monthly),
+                ),
+            ),
+        )
+        content = html.Columns([html.Column(), html.Column()])
+        return html.Tab(label=label, content=content, checked=True)
+
+    def _get_overall_funds_invested_tab(self):
+        historical_data = self._dataset.get_historical_data_sum(self._dataset.assets)
+        last_row = historical_data.iloc[-1]
+        value_change = self._dataset.get_value_change(historical_data[id.Column.NET_INVESTMENT])
+
+        label = html.Label(
+            "Funds invested",
+            html.Value(
+                self._locale.currency_str(last_row[id.Column.NET_INVESTMENT]),
+                valuechange=html.ValueChange(
+                    self._locale.currency_str(value_change.daily),
+                    self._locale.currency_str(value_change.monthly),
+                ),
+            ),
+        )
+        content = html.Columns([html.Column(), html.Column()])
+        return html.Tab(label=label, content=content)
+
+    def _get_overall_return_received_tab(self):
+        historical_data = self._dataset.get_historical_data_sum(self._dataset.assets)
+        last_row = historical_data.iloc[-1]
+        value_change = self._dataset.get_value_change(historical_data[id.Column.NET_RETURN])
+
+        label = html.Label(
+            "Return received",
+            html.Value(
+                self._locale.currency_str(last_row[id.Column.NET_RETURN]),
+                valuechange=html.ValueChange(
+                    self._locale.currency_str(value_change.daily),
+                    self._locale.currency_str(value_change.monthly),
+                ),
+            ),
+        )
+        content = html.Columns([html.Column(), html.Column()])
+        return html.Tab(label=label, content=content)
+
+    def _get_overall_net_profit_tab(self):
+        historical_data = self._dataset.get_historical_data_sum(self._dataset.assets)
+        last_row = historical_data.iloc[-1]
+        value_change = self._dataset.get_value_change(historical_data[id.Column.NET_PROFIT])
+
+        label = html.Label(
+            "Net profit",
+            html.Value(
+                self._locale.currency_str(last_row[id.Column.NET_PROFIT]),
+                valuechange=html.ValueChange(
+                    self._locale.currency_str(value_change.daily),
+                    self._locale.currency_str(value_change.monthly),
+                ),
+            ).color(),
+        )
+        content = html.Columns([html.Column(), html.Column()])
+        return html.Tab(label=label, content=content)
+
+    def _get_overall_relative_net_profit_tab(self):
+        historical_data = self._dataset.get_historical_data_sum(self._dataset.assets)
+        last_row = historical_data.iloc[-1]
+        value_change = self._dataset.get_value_change(historical_data[id.Column.RELATIVE_NET_PROFIT])
+
+        label = html.Label(
+            "Relative net profit",
+            html.Value(
+                self._locale.percentage_str(last_row[id.Column.RELATIVE_NET_PROFIT]),
+                valuechange=html.ValueChange(
+                    self._locale.percentage_str(value_change.daily),
+                    self._locale.percentage_str(value_change.monthly),
+                ),
+            ).color(),
+        )
+        content = html.Columns([html.Column(), html.Column()])
+        return html.Tab(label=label, content=content)
 
     def _append_historical_data_tabs(self):
         tabs = []
 
         groups = self._list_by_value(self._dataset.assets, id.Attribute.GROUP)
         for group in groups:
-            content = ''
+            content = ""
             dividers_to_add = 0
 
             group_assets = self._dataset.assets[
@@ -88,7 +189,9 @@ class Report:
             ):
                 open_by_default = any(group_assets[id.Attribute.ACTIVE])
                 content += self._create_historical_data_view(
-                    assets=group_assets, name=f'{group} Total', open_by_default=open_by_default
+                    assets=group_assets,
+                    name=f"{group} Total",
+                    open_by_default=open_by_default,
                 )
                 dividers_to_add = 2  # double divider after Total
 
@@ -104,11 +207,15 @@ class Report:
                 if (account != dataset.unassigned) and (len(account_asset_names) > 1):
                     open_by_default = any(account_assets[id.Attribute.ACTIVE])
                     content += self._create_historical_data_view(
-                        assets=account_assets, name=f'{account} Total', open_by_default=open_by_default
+                        assets=account_assets,
+                        name=f"{account} Total",
+                        open_by_default=open_by_default,
                     )
 
                 for asset in account_asset_names:
-                    asset_data = account_assets[account_assets[id.Attribute.NAME] == asset]
+                    asset_data = account_assets[
+                        account_assets[id.Attribute.NAME] == asset
+                    ]
                     open_by_default = any(asset_data[id.Attribute.ACTIVE])
                     content += self._create_historical_data_view(
                         assets=asset_data, open_by_default=open_by_default
@@ -119,20 +226,24 @@ class Report:
 
         if len(groups) > 1:
             content = self._create_historical_data_view(
-                assets=self._dataset.assets, name='Total'
+                assets=self._dataset.assets, name="Total"
             )
-            tabs.append(html.Tab(html.Label('<i>Total</i>'), content, checked=True))
+            tabs.append(html.Tab(html.Label("<i>Total</i>"), content, checked=True))
 
         self._report.append(html.TabContainer(tabs))
 
     def _append_log(self):
         if len(log.get().records) > 0:
-            label = 'Log'
+            label = "Log"
             if log.get().error_count > 0:
-                label += '&nbsp;&nbsp;' + html.TextBox(f'{log.get().error_count}', 'red')
+                label += "&nbsp;&nbsp;" + html.TextBox(
+                    f"{log.get().error_count}", "red"
+                )
             if log.get().warning_count > 0:
-                label += '&nbsp;&nbsp;' + html.TextBox(f'{log.get().warning_count}', 'orange')
-            content = '<br>'.join(log.get().records)
+                label += "&nbsp;&nbsp;" + html.TextBox(
+                    f"{log.get().warning_count}", "orange"
+                )
+            content = "<br>".join(log.get().records)
             self._report.append(
                 html.Container(html.Accordion(html.Heading2(label), content))
             )
@@ -140,16 +251,16 @@ class Report:
     def _append_footer(self):
         self._report.append(
             f'<p class="footer">Report generated on {self._locale.date_str(datetime.date.today())}, '
-            'using open source script: '
+            "using open source script: "
             '<a href="https://github.com/zukaitis/investment-tracker/">Investment Tracker</a>'
-            '<br>All charts are displayed using '
+            "<br>All charts are displayed using "
             '<a href="https://plotly.com/python/">Plotly</p>'
         )
 
     def _list_by_value(self, assets: pd.DataFrame, group_by: id.Attribute) -> list:
         groups = assets.groupby(group_by)
         groups = groups.agg(
-            {id.Attribute.VALUE: 'sum', id.Attribute.ACTIVE: 'any'}
+            {id.Attribute.VALUE: "sum", id.Attribute.ACTIVE: "any"}
         ).reset_index()
         groups.sort_values(
             by=[id.Attribute.VALUE, id.Attribute.ACTIVE], inplace=True, ascending=False
@@ -163,7 +274,7 @@ class Report:
     def _create_historical_data_view(
         self, assets: pd.DataFrame, name: str = None, open_by_default: bool = True
     ) -> str:
-        
+
         label = self._create_historical_data_view_header(assets, name)
         content = self._create_historical_data_view_statistics(assets)
         content += self._create_historical_data_figures(assets)
@@ -180,17 +291,17 @@ class Report:
 
         if len(assets) == 1:
             if first_row[id.Attribute.YFINANCE_FETCH_SUCCESSFUL]:
-                title += f' - {self._get_successful_fetch_indicator(first_row[id.Attribute.SYMBOL])}'
+                title += f" - {self._get_successful_fetch_indicator(first_row[id.Attribute.SYMBOL])}"
             elif first_row[id.Attribute.SYMBOL] != dataset.unassigned:
-                title += f' - {first_row[id.Attribute.SYMBOL]}'
+                title += f" - {first_row[id.Attribute.SYMBOL]}"
 
             if first_row[id.Attribute.ACCOUNT] != dataset.unassigned:
-                title += f'<br>{first_row[id.Attribute.ACCOUNT]}'
+                title += f"<br>{first_row[id.Attribute.ACCOUNT]}"
 
             info = (
                 first_row[id.Attribute.INFO]
                 if (first_row[id.Attribute.INFO] != dataset.unassigned)
-                else ''
+                else ""
             )
             return html.Columns(
                 [
@@ -217,7 +328,7 @@ class Report:
             )
             statistics.append(
                 html.Label(
-                    'Value',
+                    "Value",
                     html.Value(
                         self._locale.currency_str(last_row[id.Column.VALUE]),
                         valuechange=html.ValueChange(
@@ -238,7 +349,7 @@ class Report:
             )
             statistics.append(
                 html.Label(
-                    'Funds invested',
+                    "Funds invested",
                     html.Value(
                         self._locale.currency_str(last_row[id.Column.NET_INVESTMENT]),
                         valuechange=html.ValueChange(
@@ -259,7 +370,7 @@ class Report:
             )
             statistics.append(
                 html.Label(
-                    'Price',
+                    "Price",
                     html.Value(
                         self._locale.currency_str(last_row[id.Column.PRICE]),
                         valuechange=html.ValueChange(
@@ -276,7 +387,7 @@ class Report:
             )
             statistics.append(
                 html.Label(
-                    'Return received',
+                    "Return received",
                     html.Value(
                         self._locale.currency_str(
                             last_nonzero_row[id.Column.NET_RETURN]
@@ -294,7 +405,7 @@ class Report:
         )
         statistics.append(
             html.Label(
-                'Net profit',
+                "Net profit",
                 html.Value(
                     self._locale.currency_str(last_nonzero_row[id.Column.NET_PROFIT]),
                     valuechange=html.ValueChange(
@@ -310,7 +421,7 @@ class Report:
         )
         statistics.append(
             html.Label(
-                'Relative net profit',
+                "Relative net profit",
                 html.Value(
                     self._locale.percentage_str(
                         last_nonzero_row[id.Column.RELATIVE_NET_PROFIT]
@@ -323,7 +434,7 @@ class Report:
             )
         )
 
-        return f'{html.Columns(statistics)}'
+        return f"{html.Columns(statistics)}"
 
     def _create_historical_data_figures(self, assets: pd.DataFrame) -> str:
         historical_data = self._dataset.get_historical_data_sum(assets)
@@ -340,6 +451,6 @@ class Report:
                     html.Column(content=historical_figure),
                 ]
             )
-            return f'{figures}'
+            return f"{figures}"
 
-        return ''
+        return ""
