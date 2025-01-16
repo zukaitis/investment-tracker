@@ -89,6 +89,199 @@ class Graphing:
 
         return fig
 
+    def get_sunburst(self, attribute: id.Attribute, label_text: str) -> str:
+        class Attribute(enum.Enum):
+            LABEL = enum.auto()
+            ID = enum.auto()
+            PARENT = enum.auto()
+            PROFITABILITY = enum.auto()
+            PROFITABILITY_SUM = enum.auto()
+            GROUP_SUM = enum.auto()
+            DISPLAY_STRING = enum.auto()
+            DISPLAYED_FRACTION = enum.auto()
+            FRACTION_IN_GROUP = enum.auto()
+            FRACTION_IN_PROFITABILITY = enum.auto()
+            PERCENTAGE_IN_PROFITABILITY_STRING = enum.auto()
+            OF_PROFITABILITY_STRING = enum.auto()
+            OF_GROUP_STRING = enum.auto()
+            SEPARATOR_STRING = enum.auto()
+
+        data = self._dataset.assets[
+            self._dataset.assets[attribute] != 0
+        ].copy()  # filter 0 values
+        data[Attribute.PROFITABILITY] = np.where(
+            data[attribute] > 0, "Profitable", "Unprofitable"
+        )
+
+        # move name in place of account to avoid empty rings in graph
+        data.loc[
+            data[id.Attribute.ACCOUNT] == dataset.unassigned,
+            [id.Attribute.ACCOUNT, id.Attribute.NAME],
+        ] = np.array(
+            [
+                data.loc[
+                    data[id.Attribute.ACCOUNT] == dataset.unassigned, id.Attribute.NAME
+                ],
+                None,
+            ],
+            dtype="object",
+        )
+
+        data[[Attribute.PROFITABILITY_SUM, Attribute.GROUP_SUM]] = 0.0
+        for p in data[Attribute.PROFITABILITY].unique():
+            p_subset = data[Attribute.PROFITABILITY] == p
+            data.loc[p_subset, Attribute.PROFITABILITY_SUM] = data.loc[
+                p_subset, attribute
+            ].sum()
+            for g in data.loc[p_subset, id.Attribute.GROUP].unique():
+                g_subset = p_subset & (data[id.Attribute.GROUP] == g)
+                data.loc[g_subset, Attribute.GROUP_SUM] = data.loc[
+                    g_subset, attribute
+                ].sum()
+
+        graph_data = pd.DataFrame(
+            columns=[
+                Attribute.LABEL,
+                Attribute.ID,
+                Attribute.PARENT,
+                id.Attribute.VALUE,
+                id.Attribute.COLOR,
+            ]
+        )
+        graph_data[[Attribute.LABEL, Attribute.ID, Attribute.PARENT]] = ""
+        tree = [
+            Attribute.PROFITABILITY,
+            id.Attribute.GROUP,
+            id.Attribute.ACCOUNT,
+            id.Attribute.NAME,
+        ]
+        if attribute in [
+            id.Attribute.VALUE,
+            id.Attribute.NET_INVESTMENT,
+            id.Attribute.NET_RETURN,
+        ]:
+            tree.remove(
+                Attribute.PROFITABILITY
+            )  # don't separate these graphs by profitability
+
+        for t in range(len(tree)):
+            d = data.groupby(tree[: t + 1]).first().reset_index()
+            d[attribute] = data.groupby(tree[: t + 1]).sum().reset_index()[attribute]
+            if attribute == id.Attribute.RELATIVE_NET_PROFIT:
+                d[[id.Attribute.NET_PROFIT, id.Attribute.NET_INVESTMENT_MAX]] = (
+                    data.groupby(tree[: t + 1])
+                    .sum()
+                    .reset_index()[
+                        [id.Attribute.NET_PROFIT, id.Attribute.NET_INVESTMENT_MAX]
+                    ]
+                )
+                d[Attribute.DISPLAYED_FRACTION] = (
+                    d[id.Attribute.NET_PROFIT] / d[id.Attribute.NET_INVESTMENT_MAX]
+                )
+                d[Attribute.DISPLAY_STRING] = d[Attribute.DISPLAYED_FRACTION].apply(
+                    self._locale.percentage_str
+                )
+            else:
+                d[Attribute.FRACTION_IN_GROUP] = d[attribute] / d[Attribute.GROUP_SUM]
+                d[Attribute.FRACTION_IN_PROFITABILITY] = (
+                    d[attribute] / d[Attribute.PROFITABILITY_SUM]
+                )
+                d[Attribute.PERCENTAGE_IN_PROFITABILITY_STRING] = np.where(
+                    d[Attribute.FRACTION_IN_PROFITABILITY] < 1,
+                    "<br>"
+                    + d[Attribute.FRACTION_IN_PROFITABILITY].apply(
+                        self._locale.percentage_str
+                    ),
+                    "",
+                )
+                if (
+                    d[Attribute.PROFITABILITY].nunique() > 1
+                ):  # if values are separated by profitability
+                    d[Attribute.OF_PROFITABILITY_STRING] = np.where(
+                        d[Attribute.FRACTION_IN_PROFITABILITY] < 1,
+                        " of " + d[Attribute.PROFITABILITY],
+                        "",
+                    )
+                    d[Attribute.SEPARATOR_STRING] = "<br>"
+                else:
+                    d[Attribute.OF_PROFITABILITY_STRING] = ""
+                    d[Attribute.SEPARATOR_STRING] = " / "
+                d[Attribute.SEPARATOR_STRING] = np.where(
+                    d[Attribute.FRACTION_IN_GROUP] < 1,
+                    d[Attribute.SEPARATOR_STRING],
+                    "",
+                )
+                d[Attribute.OF_GROUP_STRING] = np.where(
+                    d[Attribute.FRACTION_IN_GROUP] < 1,
+                    d[Attribute.FRACTION_IN_GROUP].apply(self._locale.percentage_str)
+                    + " of "
+                    + d[id.Attribute.GROUP],
+                    "",
+                )
+                # don't display fraction in group, when it matches fraction in profitability
+                d.loc[
+                    d[Attribute.FRACTION_IN_PROFITABILITY]
+                    == d[Attribute.FRACTION_IN_GROUP],
+                    [Attribute.SEPARATOR_STRING, Attribute.OF_GROUP_STRING],
+                ] = [["", ""]]
+                d[Attribute.DISPLAY_STRING] = (
+                    d[attribute].apply(self._locale.currency_str)
+                    + d[Attribute.PERCENTAGE_IN_PROFITABILITY_STRING]
+                    + d[Attribute.OF_PROFITABILITY_STRING]
+                    + d[Attribute.SEPARATOR_STRING]
+                    + d[Attribute.OF_GROUP_STRING]
+                )
+            d[attribute] = abs(d[attribute])
+            d[Attribute.PARENT] = ""
+            for i in range(t):
+                d[Attribute.PARENT] += d[tree[i]]
+            d[Attribute.ID] = d[Attribute.PARENT] + d[tree[t]]
+            d = d[
+                [
+                    tree[t],
+                    Attribute.ID,
+                    Attribute.PARENT,
+                    attribute,
+                    Attribute.DISPLAY_STRING,
+                    id.Attribute.COLOR,
+                ]
+            ]
+            d.columns = [
+                Attribute.LABEL,
+                Attribute.ID,
+                Attribute.PARENT,
+                id.Attribute.VALUE,
+                Attribute.DISPLAY_STRING,
+                id.Attribute.COLOR,
+            ]
+            graph_data = pd.concat([graph_data, d])
+
+        # Set colors of Profitable and Unprofitable labels if they exist
+        graph_data.loc[
+            graph_data[Attribute.LABEL] == "Profitable", id.Attribute.COLOR
+        ] = "green"
+        graph_data.loc[
+            graph_data[Attribute.LABEL] == "Unprofitable", id.Attribute.COLOR
+        ] = "red"
+
+        sunburst = go.Figure(
+            go.Sunburst(
+                labels=graph_data[Attribute.LABEL],
+                ids=graph_data[Attribute.ID],
+                parents=graph_data[Attribute.PARENT],
+                values=graph_data[id.Attribute.VALUE],
+                sort=False,
+                customdata=graph_data[Attribute.DISPLAY_STRING],
+                marker=dict(colors=graph_data[id.Attribute.COLOR]),
+                branchvalues="total",
+                hovertemplate=f"<b>%{{label}}</b><br>{label_text}: %{{customdata}}<extra></extra>",
+            )
+        )
+        sunburst.update_traces(insidetextorientation="radial")
+        sunburst.update_layout(margin=dict(l=10, r=10, t=10, b=10))
+
+        return sunburst.to_html(full_html=False, include_plotlyjs=True)
+
     def get_yearly_asset_data_plot(self, input_data: pd.DataFrame) -> go.Figure:
         class Column(enum.Enum):
             DATE = enum.auto()
@@ -399,7 +592,7 @@ class Graphing:
             intermediate_values.index += 1
             intermediate_values["y"] = np.nan
             blue_fill = (
-                blue_fill._append(intermediate_values)
+                pd.concat([blue_fill, intermediate_values])
                 .sort_index()
                 .reset_index(drop=True)
             )

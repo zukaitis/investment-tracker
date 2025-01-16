@@ -143,6 +143,21 @@ class Dataset:
             self._assets.at[identifier, id.Attribute.VALUE] = self.historical_data[
                 identifier
             ][id.Column.VALUE].iloc[-1]
+            self._assets.at[identifier, id.Attribute.NET_INVESTMENT] = self.historical_data[
+                identifier
+            ][id.Column.NET_INVESTMENT].iloc[-1]
+            self._assets.at[identifier, id.Attribute.NET_INVESTMENT_MAX] = self.historical_data[
+                identifier
+            ][id.Column.NET_INVESTMENT_MAX].iloc[-1]
+            self._assets.at[identifier, id.Attribute.NET_RETURN] = self.historical_data[
+                identifier
+            ][id.Column.NET_RETURN].iloc[-1]
+            self._assets.at[identifier, id.Attribute.NET_PROFIT] = self.historical_data[
+                identifier
+            ][id.Column.NET_PROFIT].iloc[-1]
+            self._assets.at[identifier, id.Attribute.RELATIVE_NET_PROFIT] = self.historical_data[
+                identifier
+            ][id.Column.RELATIVE_NET_PROFIT].iloc[-1]
 
             if any(self.historical_data[identifier][id.Column.VALUE] > 0):
                 # Asset is considered active, if it's current value is non-zero

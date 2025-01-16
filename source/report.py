@@ -45,7 +45,7 @@ class Report:
 
         self._append_header()
         self._append_overall_data_tabs()
-        self._append_historical_data_tabs()
+        # self._append_historical_data_tabs()
         self._append_log()
         self._append_footer()
 
@@ -70,7 +70,8 @@ class Report:
     def _append_overall_data_tabs(self):
         tabs = [self._get_overall_value_tab()]
         tabs.append(self._get_overall_funds_invested_tab())
-        tabs.append(self._get_overall_return_received_tab())
+        if any(self._dataset.assets[id.Attribute.NET_RETURN] > 0):
+            tabs.append(self._get_overall_return_received_tab())
         tabs.append(self._get_overall_net_profit_tab())
         tabs.append(self._get_overall_relative_net_profit_tab())
         self._report.append(html.TabContainer(tabs))
@@ -93,7 +94,7 @@ class Report:
                 ),
             ),
         )
-        content = html.Columns([html.Column(), html.Column()])
+        content = html.Columns([html.Column(width=30, content=self._graphing.get_sunburst(attribute=id.Attribute.VALUE, label_text="Value")), html.Column()])
         return html.Tab(label=label, content=content, checked=True)
 
     def _get_overall_funds_invested_tab(self):
@@ -111,7 +112,7 @@ class Report:
                 ),
             ),
         )
-        content = html.Columns([html.Column(), html.Column()])
+        content = html.Columns([html.Column(width=30, content=self._graphing.get_sunburst(attribute=id.Attribute.NET_INVESTMENT, label_text="Funds invested")), html.Column()])
         return html.Tab(label=label, content=content)
 
     def _get_overall_return_received_tab(self):
@@ -129,7 +130,7 @@ class Report:
                 ),
             ),
         )
-        content = html.Columns([html.Column(), html.Column()])
+        content = html.Columns([html.Column(width=30, content=self._graphing.get_sunburst(attribute=id.Attribute.NET_RETURN, label_text="Return received")), html.Column()])
         return html.Tab(label=label, content=content)
 
     def _get_overall_net_profit_tab(self):
@@ -147,7 +148,7 @@ class Report:
                 ),
             ).color(),
         )
-        content = html.Columns([html.Column(), html.Column()])
+        content = html.Columns([html.Column(width=30, content=self._graphing.get_sunburst(attribute=id.Attribute.NET_PROFIT, label_text="Net profit")), html.Column()])
         return html.Tab(label=label, content=content)
 
     def _get_overall_relative_net_profit_tab(self):
@@ -165,7 +166,7 @@ class Report:
                 ),
             ).color(),
         )
-        content = html.Columns([html.Column(), html.Column()])
+        content = html.Columns([html.Column(width=30, content=self._graphing.get_sunburst(attribute=id.Attribute.RELATIVE_NET_PROFIT, label_text="Relative net profit")), html.Column()])
         return html.Tab(label=label, content=content)
 
     def _append_historical_data_tabs(self):
