@@ -41,3 +41,16 @@ class Attribute(enum.Enum):
     ACTIVE = enum.auto()
     YFINANCE_FETCH_SUCCESSFUL = enum.auto()
     DISPLAY_PRICE = enum.auto()
+
+
+def get_corresponding_attribute(column: Column) -> Attribute:
+    map = {
+        Column.VALUE: Attribute.VALUE,
+        Column.NET_INVESTMENT: Attribute.NET_INVESTMENT,
+        Column.NET_INVESTMENT_MAX: Attribute.NET_INVESTMENT_MAX,
+        Column.NET_RETURN: Attribute.NET_RETURN,
+        Column.NET_PROFIT: Attribute.NET_PROFIT,
+        Column.RELATIVE_NET_PROFIT: Attribute.RELATIVE_NET_PROFIT,
+    }
+
+    return map[column]

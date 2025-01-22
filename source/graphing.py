@@ -6,6 +6,7 @@ from source import settings
 import datetime
 import enum
 import plotly.graph_objects as go
+import plotly.express as px
 import numpy as np
 import pandas as pd
 
@@ -281,6 +282,90 @@ class Graphing:
         sunburst.update_layout(margin=dict(l=10, r=10, t=10, b=10))
 
         return sunburst.to_html(full_html=False, include_plotlyjs=True)
+
+    _cyan = px.colors.qualitative.Plotly[5]
+
+    def get_monthly_graph(self, column: id.Column, label_text: str) -> str:
+        data = self._dataset.get_monthly_data(column)
+        data_str = (
+            data.map(self._locale.percentage_str)
+            if (column == id.Column.RELATIVE_NET_PROFIT)
+            else data.map(self._locale.currency_str)
+        )
+
+        data_sum = self._dataset.get_monthly_data_sum(column)
+        data_sum_str = (
+            data_sum.map(self._locale.percentage_str)
+            if (column == id.Column.RELATIVE_NET_PROFIT)
+            else data_sum.map(self._locale.currency_str)
+        )
+
+        if column == id.Column.RELATIVE_NET_PROFIT:
+            data *= 100
+            data_sum *= 100
+
+        fig = go.Figure()
+        fig.add_trace(
+            go.Scatter(
+                x=data_sum.index,
+                y=data_sum.values,
+                mode="lines+markers",
+                name="Total",
+                marker=dict(color=Graphing._cyan),
+                customdata=np.transpose(data_sum_str.values),
+                hovertemplate=(
+                    f"%{{x|%B %Y}}<br>"
+                    f"<b>Total {label_text.lower()}:</b> %{{customdata}}<extra></extra>"
+                ),
+            )
+        )
+
+        for a in data.columns:
+            if any(data[a] != 0.0):
+                name = self._dataset.assets.loc[a, id.Attribute.NAME]
+                fig.add_trace(
+                    go.Bar(
+                        x=data.index,
+                        y=data[a],
+                        name=name,
+                        marker=dict(
+                            color=self._dataset.assets.loc[a, id.Attribute.COLOR]
+                        ),
+                        customdata=np.transpose(data_str[a]),
+                        hovertemplate=(
+                            f"%{{x|%B %Y}}<br>"
+                            f"<b>{name}</b><br>"
+                            f"{label_text}: %{{customdata}}<extra></extra>"
+                        ),
+                    )
+                )
+
+        bar_mode = (
+            "group"
+            if (
+                (column == id.Column.RETURN)
+                or (column == id.Column.RELATIVE_NET_PROFIT)
+            )
+            else "relative"
+        )
+        fig.update_layout(barmode=bar_mode)
+        six_months = [
+            data.index[-1] - datetime.timedelta(days=(365 / 2 - 15)),
+            data.index[-1] + datetime.timedelta(days=15),
+        ]
+        fig.update_xaxes(range=six_months)
+        if column == id.Column.RELATIVE_NET_PROFIT:
+            fig.update_yaxes(ticksuffix=self._locale.percentage_tick_suffix())
+        else:
+            fig.update_yaxes(
+                ticksuffix=self._locale.currency_tick_suffix(),
+                tickprefix=self._locale.currency_tick_prefix(),
+            )
+        self._configure_historical_dataview(
+            fig, self._dataset.latest_date - data.index[0]
+        )
+
+        return fig.to_html(full_html=False, include_plotlyjs=True)
 
     def get_yearly_asset_data_plot(self, input_data: pd.DataFrame) -> go.Figure:
         class Column(enum.Enum):

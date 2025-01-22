@@ -74,6 +74,10 @@ class Tab:
     content: str = ''
     checked: bool = False
 
+    def check(self):
+        self.checked = True
+        return self
+
 
 _tab_container_count = 0
 

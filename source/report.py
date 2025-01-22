@@ -45,7 +45,7 @@ class Report:
 
         self._append_header()
         self._append_overall_data_tabs()
-        # self._append_historical_data_tabs()
+        self._append_historical_data_tabs()
         self._append_log()
         self._append_footer()
 
@@ -68,105 +68,65 @@ class Report:
         )
 
     def _append_overall_data_tabs(self):
-        tabs = [self._get_overall_value_tab()]
-        tabs.append(self._get_overall_funds_invested_tab())
+        tabs = [self._get_overall_data_tab(id.Column.VALUE, "Value").check()]
+        tabs.append(
+            self._get_overall_data_tab(id.Column.NET_INVESTMENT, "Funds invested")
+        )
         if any(self._dataset.assets[id.Attribute.NET_RETURN] > 0):
-            tabs.append(self._get_overall_return_received_tab())
-        tabs.append(self._get_overall_net_profit_tab())
-        tabs.append(self._get_overall_relative_net_profit_tab())
+            tabs.append(
+                self._get_overall_data_tab(id.Column.NET_RETURN, "Return received")
+            )
+        tabs.append(self._get_overall_data_tab(id.Column.NET_PROFIT, "Net profit"))
+        tabs.append(
+            self._get_overall_data_tab(
+                id.Column.RELATIVE_NET_PROFIT, "Relative net profit"
+            )
+        )
         self._report.append(html.TabContainer(tabs))
 
-    def _get_overall_value_tab(self) -> html.Tab:
+    def _get_overall_data_tab(self, column: id.Column, label_text: str) -> html.Tab:
         historical_data = self._dataset.get_historical_data_sum(self._dataset.assets)
         last_row = historical_data.iloc[-1]
-        # Buying/selling assets shouldn't affect value change indicators
-        value_change = self._dataset.get_value_change(
-            historical_data[id.Column.VALUE] - historical_data[id.Column.NET_INVESTMENT]
-        )
+        if column == id.Column.VALUE:
+            # Buying/selling assets shouldn't affect value change indicators
+            value_change = self._dataset.get_value_change(
+                historical_data[id.Column.VALUE]
+                - historical_data[id.Column.NET_INVESTMENT]
+            )
+        else:
+            value_change = self._dataset.get_value_change(historical_data[column])
 
-        label = html.Label(
-            "Value",
-            html.Value(
-                self._locale.currency_str(last_row[id.Column.VALUE]),
-                valuechange=html.ValueChange(
-                    self._locale.currency_str(value_change.daily),
-                    self._locale.currency_str(value_change.monthly),
-                ),
-            ),
-        )
-        content = html.Columns([html.Column(width=30, content=self._graphing.get_sunburst(attribute=id.Attribute.VALUE, label_text="Value")), html.Column()])
-        return html.Tab(label=label, content=content, checked=True)
-
-    def _get_overall_funds_invested_tab(self):
-        historical_data = self._dataset.get_historical_data_sum(self._dataset.assets)
-        last_row = historical_data.iloc[-1]
-        value_change = self._dataset.get_value_change(historical_data[id.Column.NET_INVESTMENT])
-
-        label = html.Label(
-            "Funds invested",
-            html.Value(
-                self._locale.currency_str(last_row[id.Column.NET_INVESTMENT]),
-                valuechange=html.ValueChange(
-                    self._locale.currency_str(value_change.daily),
-                    self._locale.currency_str(value_change.monthly),
-                ),
-            ),
-        )
-        content = html.Columns([html.Column(width=30, content=self._graphing.get_sunburst(attribute=id.Attribute.NET_INVESTMENT, label_text="Funds invested")), html.Column()])
-        return html.Tab(label=label, content=content)
-
-    def _get_overall_return_received_tab(self):
-        historical_data = self._dataset.get_historical_data_sum(self._dataset.assets)
-        last_row = historical_data.iloc[-1]
-        value_change = self._dataset.get_value_change(historical_data[id.Column.NET_RETURN])
-
-        label = html.Label(
-            "Return received",
-            html.Value(
-                self._locale.currency_str(last_row[id.Column.NET_RETURN]),
-                valuechange=html.ValueChange(
-                    self._locale.currency_str(value_change.daily),
-                    self._locale.currency_str(value_change.monthly),
-                ),
-            ),
-        )
-        content = html.Columns([html.Column(width=30, content=self._graphing.get_sunburst(attribute=id.Attribute.NET_RETURN, label_text="Return received")), html.Column()])
-        return html.Tab(label=label, content=content)
-
-    def _get_overall_net_profit_tab(self):
-        historical_data = self._dataset.get_historical_data_sum(self._dataset.assets)
-        last_row = historical_data.iloc[-1]
-        value_change = self._dataset.get_value_change(historical_data[id.Column.NET_PROFIT])
-
-        label = html.Label(
-            "Net profit",
-            html.Value(
-                self._locale.currency_str(last_row[id.Column.NET_PROFIT]),
-                valuechange=html.ValueChange(
-                    self._locale.currency_str(value_change.daily),
-                    self._locale.currency_str(value_change.monthly),
-                ),
-            ).color(),
-        )
-        content = html.Columns([html.Column(width=30, content=self._graphing.get_sunburst(attribute=id.Attribute.NET_PROFIT, label_text="Net profit")), html.Column()])
-        return html.Tab(label=label, content=content)
-
-    def _get_overall_relative_net_profit_tab(self):
-        historical_data = self._dataset.get_historical_data_sum(self._dataset.assets)
-        last_row = historical_data.iloc[-1]
-        value_change = self._dataset.get_value_change(historical_data[id.Column.RELATIVE_NET_PROFIT])
-
-        label = html.Label(
-            "Relative net profit",
-            html.Value(
+        if column == id.Column.RELATIVE_NET_PROFIT:
+            value = html.Value(
                 self._locale.percentage_str(last_row[id.Column.RELATIVE_NET_PROFIT]),
                 valuechange=html.ValueChange(
                     self._locale.percentage_str(value_change.daily),
                     self._locale.percentage_str(value_change.monthly),
                 ),
-            ).color(),
+            ).color()
+        else:
+            value = html.Value(
+                self._locale.currency_str(last_row[column]),
+                valuechange=html.ValueChange(
+                    self._locale.currency_str(value_change.daily),
+                    self._locale.currency_str(value_change.monthly),
+                ),
+            )
+            if column == id.Column.NET_PROFIT:
+                value = value.color()
+
+        label = html.Label(label_text, value)
+        content = html.Columns(
+            [
+                html.Column(
+                    width=30,
+                    content=self._graphing.get_sunburst(
+                        attribute=id.get_corresponding_attribute(column), label_text=label_text
+                    ),
+                ),
+                html.Column(content=self._graphing.get_monthly_graph(column=column, label_text=label_text)),
+            ]
         )
-        content = html.Columns([html.Column(width=30, content=self._graphing.get_sunburst(attribute=id.Attribute.RELATIVE_NET_PROFIT, label_text="Relative net profit")), html.Column()])
         return html.Tab(label=label, content=content)
 
     def _append_historical_data_tabs(self):

@@ -74,7 +74,7 @@ class Locale:
             return f'{self.currency_symbol()}'
 
     def percentage_tick_suffix(self) -> str:
-        string = percentage_str(777)  # checking generated string of random percentage
+        string = self.percentage_str(777)  # checking generated string of random percentage
         if string[-2] == ' ':
             return ' %'
         return '%'
