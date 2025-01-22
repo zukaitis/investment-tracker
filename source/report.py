@@ -121,10 +121,20 @@ class Report:
                 html.Column(
                     width=30,
                     content=self._graphing.get_sunburst(
-                        attribute=id.get_corresponding_attribute(column), label_text=label_text
+                        attribute=id.get_corresponding_attribute(column),
+                        label_text=label_text,
                     ),
                 ),
-                html.Column(content=self._graphing.get_monthly_graph(column=column, label_text=label_text)),
+                html.Column(
+                    content=self._graphing.get_monthly_graph(
+                        column=(
+                            id.Column.RETURN
+                            if (column == id.Column.NET_RETURN)
+                            else column
+                        ),
+                        label_text=label_text,
+                    )
+                ),
             ]
         )
         return html.Tab(label=label, content=content)

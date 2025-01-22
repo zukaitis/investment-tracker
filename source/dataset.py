@@ -109,10 +109,7 @@ class Dataset:
     def get_monthly_data_sum(self, column: id.Column) -> pd.Series:
         monthly = self.get_historical_data_sum(self._assets)
         monthly = monthly[column]
-        aggregate_by = "sum" if (column == id.Column.RETURN) else "last"
-        monthly = monthly.groupby(
-            [monthly.index.year, monthly.index.month]
-        ).agg(aggregate_by)
+        monthly = monthly.groupby([monthly.index.year, monthly.index.month]).agg("last")
         monthly.index = monthly.index.map(
             lambda x: pd.Timestamp(year=x[0], month=x[1], day=1)
         )
@@ -181,7 +178,7 @@ class Dataset:
             )
             self._assets.at[identifier, id.Attribute.NET_RETURN] = self.historical_data[
                 identifier
-            ][id.Column.NET_RETURN].iloc[-1]
+            ][id.Column.RETURN].sum()
             self._assets.at[identifier, id.Attribute.NET_PROFIT] = self.historical_data[
                 identifier
             ][id.Column.NET_PROFIT].iloc[-1]
