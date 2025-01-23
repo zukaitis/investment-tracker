@@ -72,7 +72,7 @@ class Report:
         tabs.append(
             self._get_overall_data_tab(id.Column.NET_INVESTMENT, "Funds invested")
         )
-        if any(self._dataset.assets[id.Attribute.NET_RETURN] > 0):
+        if any((self._dataset.assets[id.Attribute.NET_RETURN] > 0) & self._dataset.assets[id.Attribute.ACTIVE]):
             tabs.append(
                 self._get_overall_data_tab(id.Column.NET_RETURN, "Return received")
             )

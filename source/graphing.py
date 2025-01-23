@@ -225,6 +225,9 @@ class Graphing:
             else data.map(self._locale.currency_str)
         )
 
+        cumulative_data = data.cumsum()
+        cumulative_data_str = cumulative_data.map(self._locale.currency_str)
+
         data_sum = self._dataset.get_monthly_data_sum(
             id.Column.NET_RETURN if (column == id.Column.RETURN) else column
         )
@@ -258,6 +261,13 @@ class Graphing:
         for a in data.columns:
             if any(data[a] != 0.0):
                 name = self._dataset.assets.loc[a, id.Attribute.NAME]
+                hover_template = (
+                    "%{x|%B %Y}<br>"
+                    f"<b>{name}</b><br>"
+                    f"{label_text}: %{{customdata[0]}}<extra></extra>"
+                )
+                if column == id.Column.RETURN:
+                    hover_template += "<br>Total return received: %{customdata[1]}"
                 fig.add_trace(
                     go.Bar(
                         x=data.index,
@@ -266,12 +276,8 @@ class Graphing:
                         marker=dict(
                             color=self._dataset.assets.loc[a, id.Attribute.COLOR]
                         ),
-                        customdata=np.transpose(data_str[a]),
-                        hovertemplate=(
-                            f"%{{x|%B %Y}}<br>"
-                            f"<b>{name}</b><br>"
-                            f"{label_text}: %{{customdata}}<extra></extra>"
-                        ),
+                        customdata=np.transpose([data_str[a], cumulative_data_str[a]]),
+                        hovertemplate=hover_template,
                     )
                 )
 

@@ -73,12 +73,18 @@ class Dataset:
                 all_dates.append(self.historical_data[a].index).unique().sort_values()
             )
 
-        # result = pd.DataFrame(columns=id.Column, index=all_dates)
         result = pd.DataFrame(index=all_dates)
-        result[[id.Column.VALUE, id.Column.INVESTMENT, id.Column.RETURN]] = 0
+        result[[id.Column.VALUE, id.Column.INVESTMENT, id.Column.RETURN]] = 0.0
         for a in assets:
             historical = self.historical_data[a].reindex(all_dates)
-            historical[[id.Column.PRICE, id.Column.AMOUNT, id.Column.COMMENT]] = np.nan
+            historical[
+                [
+                    id.Column.PRICE,
+                    id.Column.AMOUNT,
+                    id.Column.COMMENT,
+                    id.Column.RETURN_TAX,
+                ]
+            ] = np.nan
             historical = self._interpolate_historical_data(historical)
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
@@ -475,6 +481,10 @@ class Dataset:
             data.loc[non_zero, id.Column.NET_PROFIT]
             / data.loc[non_zero, id.Column.NET_INVESTMENT_MAX]
         )
+
+        if all(data[id.Column.VALUE] == 0.0) and all(data[id.Column.RETURN] == 0.0):
+            # Set relative net profit for taxes to 0 instead of -100%
+            data[id.Column.RELATIVE_NET_PROFIT] = 0.0
 
         return data
 
