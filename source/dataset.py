@@ -108,7 +108,7 @@ class Dataset:
 
             monthly = pd.concat([monthly, asset_monthly], axis=1)
 
-        if column != id.Column.RETURN:
+        if (column != id.Column.RETURN) and (column != id.Column.RELATIVE_NET_PROFIT):
             monthly = monthly.sort_index().ffill()
         return monthly.fillna(0.0).sort_index()
 
