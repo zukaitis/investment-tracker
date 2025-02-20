@@ -2,6 +2,6 @@ dominate == 2.9.1
 numpy == 2.2.1
 pandas == 2.2.3
 plotly == 5.24.1
-yfinance == 0.2.33
+yfinance == 0.2.54
 colorful == 0.5.6
 pyyaml == 6.0.2
