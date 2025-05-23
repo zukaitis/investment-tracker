@@ -156,7 +156,11 @@ class Dataset:
         latest_month = self.latest_date.year * 12 + self.latest_date.month
 
         if (
-            (monthly.loc[monthly.index[-1], "m"] - monthly.loc[monthly.index[-2], "m"])
+            (len(monthly) >= 2)
+            and (
+                monthly.loc[monthly.index[-1], "m"]
+                - monthly.loc[monthly.index[-2], "m"]
+            )
             == 1
         ) and (latest_month - monthly.loc[monthly.index[-1], "m"] <= 1):
             value_change.monthly = (
