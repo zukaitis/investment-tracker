@@ -481,9 +481,16 @@ class Dataset:
         )
 
         non_zero = data[id.Column.NET_INVESTMENT_MAX] != 0
-        data.loc[non_zero, id.Column.RELATIVE_NET_PROFIT] = (
-            data.loc[non_zero, id.Column.NET_PROFIT]
-            / data.loc[non_zero, id.Column.NET_INVESTMENT_MAX]
+        data.loc[non_zero, id.Column.RELATIVE_NET_PROFIT] = np.where(
+            data.loc[non_zero, id.Column.NET_PROFIT] > 0,
+            (
+                data.loc[non_zero, id.Column.NET_PROFIT]
+                / data.loc[non_zero, id.Column.NET_INVESTMENT_MAX]
+            ),
+            (
+                data.loc[non_zero, id.Column.NET_PROFIT]
+                / data.loc[non_zero, id.Column.NET_INVESTMENT]
+            ),
         )
 
         if all(data[id.Column.VALUE] == 0.0) and all(data[id.Column.RETURN] == 0.0):

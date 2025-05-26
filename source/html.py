@@ -95,7 +95,7 @@ class TabContainer(_HtmlObject):
             self._raw += f'<input id="{tab_name}" type="radio" name="{container_name}"'
             self._raw += f' checked>' if tab[i].checked else f'>'
             self._raw += (
-                f'<label class="tab_label" style="width:{width:.2f}%" for="{tab_name}">'
+                f'<label class="tab_label" style="width:{width:.4f}%" for="{tab_name}">'
             )
             self._raw += str(tab[i].label)
             self._raw += '</label>'
