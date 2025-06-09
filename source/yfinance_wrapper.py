@@ -44,6 +44,10 @@ class YfinanceWrapper:
                 currency_rate.index = currency_rate.index.tz_convert(
                     self.settings.timezone
                 ).tz_localize(None)
+                all_dates = currency_rate.index
+                all_dates = all_dates.append(data.index).unique().sort_values()
+                data = data.reindex(all_dates).interpolate().bfill()
+                currency_rate = currency_rate.reindex(all_dates).interpolate().bfill()
                 data[self.settings.autofill_price_mark] *= currency_rate[
                     self.settings.autofill_price_mark
                 ]
