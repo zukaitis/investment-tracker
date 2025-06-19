@@ -1,7 +1,7 @@
 ---
 # right now there are only 2 settings
 owner: Example
-currency: USD
+currency: EUR
 locale: en_US
 theme: auto
 timezone: Europe/Madrid
