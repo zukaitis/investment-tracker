@@ -72,7 +72,10 @@ class Report:
         tabs.append(
             self._get_overall_data_tab(id.Column.NET_INVESTMENT, "Funds invested")
         )
-        if any((self._dataset.assets[id.Attribute.NET_RETURN] > 0) & self._dataset.assets[id.Attribute.ACTIVE]):
+        if any(
+            (self._dataset.assets[id.Attribute.NET_RETURN] > 0)
+            & self._dataset.assets[id.Attribute.ACTIVE]
+        ):
             tabs.append(
                 self._get_overall_data_tab(id.Column.NET_RETURN, "Return received")
             )
@@ -152,6 +155,9 @@ class Report:
             ]
             group_accounts = self._list_by_value(group_assets, id.Attribute.ACCOUNT)
 
+            if not self._settings.group_by_account:
+                group_accounts = [dataset.unassigned]
+
             # Display group total if there is more than one account, or only "mixed" accounts
             if (len(group_accounts) > 1) or (
                 (len(group_accounts) == 1)
@@ -168,9 +174,11 @@ class Report:
 
             for account in group_accounts:
                 content += html.Divider() * dividers_to_add
-                account_assets = group_assets[
-                    group_assets[id.Attribute.ACCOUNT] == account
-                ]
+                account_assets = (
+                    group_assets[group_assets[id.Attribute.ACCOUNT] == account]
+                    if self._settings.group_by_account
+                    else group_assets
+                )
                 account_asset_names = self._list_by_value(
                     account_assets, id.Attribute.NAME
                 )
@@ -224,8 +232,10 @@ class Report:
             f'<p class="footer">Report generated on {self._locale.date_str(datetime.date.today())}, '
             "using open source script: "
             '<a href="https://github.com/zukaitis/investment-tracker/">Investment Tracker</a>'
-            "<br>All charts are displayed using "
-            '<a href="https://plotly.com/python/">Plotly</p>'
+            "<br>Market data acquired with "
+            '<a href="https://ranaroussi.github.io/yfinance/index.html">yfinance</a>. '
+            "All charts are displayed using "
+            '<a href="https://plotly.com/python/">Plotly</a></p>'
         )
 
     def _list_by_value(self, assets: pd.DataFrame, group_by: id.Attribute) -> list:

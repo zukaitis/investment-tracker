@@ -5,4 +5,5 @@ account: Local Bank
 group: Stocks
 data:
   - { date: 2018-08, investment: +52.00, amount: 1.9991 }
-  - { date: 2020-06-03, investment: -53.00, amount: 1.001 }
+  - { date: 2018-09, investment: +5.5, amount_bought: 0.19 }
+  - { date: 2020-06-03, investment: -57.50, amount: 0.801 }

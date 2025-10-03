@@ -8,6 +8,7 @@ class Index(enum.Enum):
 
 class Column(enum.Enum):
     AMOUNT = enum.auto()
+    AMOUNT_BOUGHT = enum.auto()
     PRICE = enum.auto()
     VALUE = enum.auto()
     INVESTMENT = enum.auto()

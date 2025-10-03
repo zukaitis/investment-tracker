@@ -7,5 +7,5 @@ account:
   - should throw a warning and be ignored
 display_price: True
 data:
-  - { date: 2017-12, investment: +45, amount: 0.2}
-  - { date: 2017-11, investment: +30, amount: 0.1}
+  - { date: 2017-12, investment: +45, amount_bought: 0.1}
+  - { date: 2017-11, investment: +30, amount_bought: 0.1}
