@@ -361,6 +361,7 @@ class Dataset:
             ),
             id.Column.PRICE: InputColumn("price", non_negative=True),
             id.Column.AMOUNT: InputColumn("amount", non_negative=True),
+            id.Column.AMOUNT_BOUGHT: InputColumn("amount_bought"),
             id.Column.VALUE: InputColumn("value", non_negative=True),
         }
 
@@ -430,6 +431,40 @@ class Dataset:
         return data
 
     def _interpolate_historical_data(self, input_data: pd.DataFrame) -> pd.DataFrame:
+        data = input_data.copy()
+
+        if id.Column.AMOUNT_BOUGHT in data.columns:
+
+            class Column(enum.Enum):
+                CUMULATED_AMOUNT_BOUGHT = enum.auto()
+
+            if id.Column.AMOUNT not in data.columns:
+                data[id.Column.AMOUNT] = np.nan
+
+            relevant = (
+                data[id.Column.AMOUNT].notna() | data[id.Column.AMOUNT_BOUGHT].notna()
+            )
+
+            data.loc[relevant, Column.CUMULATED_AMOUNT_BOUGHT] = (
+                data.loc[relevant, id.Column.AMOUNT_BOUGHT].cumsum().fillna(0.0)
+            )
+            reset_index = data.loc[relevant, id.Column.AMOUNT_BOUGHT].isna().cumsum()
+            data.loc[relevant, Column.CUMULATED_AMOUNT_BOUGHT] = (
+                data.loc[relevant]
+                .groupby(reset_index)[id.Column.AMOUNT_BOUGHT]
+                .cumsum()
+                .fillna(0.0)
+            )
+            data.loc[relevant, id.Column.AMOUNT] = (
+                data.loc[relevant, id.Column.AMOUNT].ffill().fillna(0.0)
+                + data.loc[relevant, Column.CUMULATED_AMOUNT_BOUGHT]
+            )
+            data.drop(
+                [id.Column.AMOUNT_BOUGHT, Column.CUMULATED_AMOUNT_BOUGHT],
+                axis="columns",
+                inplace=True,
+            )
+
         interpolated_columns = {
             id.Column.AMOUNT: "pad",
             id.Column.PRICE: "pad",
@@ -439,7 +474,6 @@ class Dataset:
             id.Column.RETURN_TAX: "pad",
         }
 
-        data = input_data.copy()
         for col, method in interpolated_columns.items():
             if col not in data.columns:
                 data[col] = np.nan

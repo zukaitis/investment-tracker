@@ -6,6 +6,7 @@ locale: en_US
 theme: auto
 timezone: Europe/Madrid
 log_level: "info"
+group_by_account: True
 autofill_price_mark: Random1~  # existing setting with non-existant value
 
 # non-existant settings don't crash the script
