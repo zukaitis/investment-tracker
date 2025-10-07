@@ -12,11 +12,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v1
+        uses: actions/checkout@v5
+      - name: Checkout Upstream Repo
+        uses: actions/checkout@v5
+        with:
+          repository: zukaitis/investment-tracker
+          ref: ci-rework
+          path: upstream_investment_tracker
       - name: Install Python packages
         run: pip3 install -r requirements.txt
       - name: Generate Report
-        run: ./generate_report.py
+        run: ./upstream_investment_tracker/generate_report.py
       - name: Get Date
         id: get_date
         run: echo "::set-output name=date::$(date -I)" && echo "::set-output name=datetime::$(date '+%F %T')" && echo "::set-output name=tag::$(date '+%FT%H%M%S')"
@@ -43,6 +49,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./report.html
+          asset_path: ./upstream_investment_tracker/report.html
           asset_name: Report_${{ steps.get_date.outputs.date }}.html
           asset_content_type: text/html
