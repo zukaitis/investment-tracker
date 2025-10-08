@@ -6,9 +6,6 @@ on:
   push:
   workflow_dispatch:
 
-env:
-  UPSTREAM_REPO_DIR: upstream_investment_tracker
-
 jobs:
   generate-report:
     name: Generate Report
@@ -21,11 +18,11 @@ jobs:
         with:
           repository: zukaitis/investment-tracker
           ref: ci-rework
-          path: $UPSTREAM_REPO_DIR
+          path: upstream
       - name: Install Python packages
         run: pip3 install -r requirements.txt
       - name: Generate Report
-        run: ./$UPSTREAM_REPO_DIR/generate_report.py
+        run: ./upstream/generate_report.py
       - name: Get Date
         id: get_date
         run: echo "::set-output name=date::$(date -I)" && echo "::set-output name=datetime::$(date '+%F %T')" && echo "::set-output name=tag::$(date '+%FT%H%M%S')"
