@@ -25,15 +25,21 @@ jobs:
         id: set_input_dir  # TODO: rename input_data to examples, remove EXAMPLE_ from example file names
         run: |
           if [ -f "*.yaml" ]; then
-            echo "::set-output name=input_dir::."
+            echo "input_dir=." >> $GITHUB_OUTPUT
           else
-            echo "::set-output name=input_dir::./input_data"
+            echo "input_dir=./input_data" >> $GITHUB_OUTPUT
           fi
       - name: Generate Report
         run: ./upstream/generate_report.py --input_dir ${{ steps.set_input_dir.outputs.input_dir }}
       - name: Get Date
         id: get_date
-        run: echo "::set-output name=date::$(date -I)" && echo "::set-output name=datetime::$(date '+%F %T')" && echo "::set-output name=tag::$(date '+%FT%H%M%S')"
+        run: echo "date=$(date -I)" >> $GITHUB_OUTPUT
+      - name: Get Datetime
+        id: get_datetime
+        run: echo "datetime=$(date '+%F %T')" >> $GITHUB_OUTPUT
+      - name: Get Tag
+        id: get_tag
+        run: echo "tag=$(date '+%FT%H%M%S')" >> $GITHUB_OUTPUT
       - name: Delete older releases
         uses: dev-drprasad/delete-older-releases@v0.1.0
         with:
@@ -46,8 +52,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ steps.get_date.outputs.tag }}
-          release_name: Report ${{ steps.get_date.outputs.datetime }}
+          tag_name: ${{ steps.get_tag.outputs.tag }}
+          release_name: Report ${{ steps.get_datetime.outputs.datetime }}
           draft: false
           prerelease: false
       - name: Upload Release Asset
