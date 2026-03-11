@@ -22,12 +22,12 @@ jobs:
       - name: Install python packages
         run: pip3 install -r ./upstream/requirements.txt
       - name: Set input file directory
-        id: set_input_dir  # TODO: rename input_data to examples, remove EXAMPLE_ from example file names
+        id: set_input_dir
         run: |
           if [ -f "*.yaml" ]; then
             echo "input_dir=." >> $GITHUB_OUTPUT
           else
-            echo "input_dir=./input_data" >> $GITHUB_OUTPUT
+            echo "input_dir=./examples" >> $GITHUB_OUTPUT
           fi
       - name: Generate report
         run: ./upstream/generate_report.py --input_dir ${{ steps.set_input_dir.outputs.input_dir }}

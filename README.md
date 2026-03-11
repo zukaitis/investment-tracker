@@ -1,4 +1,4 @@
-![version](https://img.shields.io/badge/version-1.0.0)
+![Static Badge](https://img.shields.io/badge/version-1.0.0-gree?link=https%3A%2F%2Fgaidosas.org)
 
 # Generate a daily report about your financial portfolio by using Github Actions
 
