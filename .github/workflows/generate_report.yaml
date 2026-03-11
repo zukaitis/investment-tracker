@@ -46,7 +46,7 @@ jobs:
       - name: Rename Report
         run: mv ./report.html ${{ steps.get_report_filename.outputs.filename }}
       - name: Delete older releases
-        uses: dev-drprasad/delete-older-releases@v0.1.0
+        uses: dev-drprasad/delete-older-releases@v0.3.4
         with:
             keep_latest: 6  # specify how many old releases you want to keep here
         env:
