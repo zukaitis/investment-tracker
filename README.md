@@ -1,3 +1,4 @@
+![version](https://img.shields.io/badge/version-1.0.0)
 
 # Generate a daily report about your financial portfolio by using Github Actions
 
