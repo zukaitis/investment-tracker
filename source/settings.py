@@ -71,6 +71,12 @@ class _Float(_Setting):
         return True
 
 
+class _Bool(_Setting):
+    def _is_allowed(self, value) -> bool:
+        bool(value)
+        return True
+
+
 class _Name(_Setting):
     @_Setting.value.setter
     def value(self, value: str):
@@ -139,10 +145,17 @@ class Settings:
         default=datetime.datetime.now().astimezone().tzname(),
         description="Time zone, used in the report",
     )
-    group_by_account = _Setting(
+    group_by_account = _Bool(
         default=True,
         description="Selects whether assets should be grouped by their account",
-        allowed=[True, False],
+    )
+    errorcode_on_warning = _Bool(
+        default=True,
+        description="Selects whether script should return an errorcode when warnings were thrown",
+    )
+    errorcode_on_error = _Bool(
+        default=True,
+        description="Selects whether script should return an errorcode when errors were thrown",
     )
 
     def __init__(self):

@@ -1,5 +1,5 @@
 ---
-name: Generate Report
+name: Generate report
 on:
   schedule:
     - cron: '00 9 * * *'  # generate report everyday at 9:00 UTC
@@ -8,7 +8,7 @@ on:
 
 jobs:
   generate-report:
-    name: Generate Report
+    name: Generate report
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -19,7 +19,7 @@ jobs:
           repository: zukaitis/investment-tracker
           ref: ci-rework  # TODO: change to release branch once it's ready
           path: upstream
-      - name: Install Python packages
+      - name: Install python packages
         run: pip3 install -r ./upstream/requirements.txt
       - name: Set input file directory
         id: set_input_dir  # TODO: rename input_data to examples, remove EXAMPLE_ from example file names
@@ -29,21 +29,21 @@ jobs:
           else
             echo "input_dir=./input_data" >> $GITHUB_OUTPUT
           fi
-      - name: Generate Report
+      - name: Generate report
         run: ./upstream/generate_report.py --input_dir ${{ steps.set_input_dir.outputs.input_dir }}
-      - name: Get Date
+      - name: Get date
         id: get_date
         run: echo "date=$(date -I)" >> $GITHUB_OUTPUT
-      - name: Get Datetime
+      - name: Get datetime
         id: get_datetime
         run: echo "datetime=$(date '+%F %T')" >> $GITHUB_OUTPUT
-      - name: Get Tag
+      - name: Get tag
         id: get_tag
         run: echo "tag=$(date '+%FT%H%M%S')" >> $GITHUB_OUTPUT
-      - name: Get Report Filename
+      - name: Get report filename
         id: get_report_filename
         run: echo "filename=Report_${{ steps.get_date.outputs.date }}.html" >> $GITHUB_OUTPUT
-      - name: Rename Report
+      - name: Rename report
         run: mv ./report.html ${{ steps.get_report_filename.outputs.filename }}
       - name: Delete older releases
         uses: dev-drprasad/delete-older-releases@v0.3.4
@@ -51,7 +51,7 @@ jobs:
             keep_latest: 6  # specify how many old releases you want to keep here
         env:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Create Release
+      - name: Create release
         id: create_release
         uses: softprops/action-gh-release@v2
         with:

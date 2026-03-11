@@ -27,7 +27,9 @@ class Main:
         # self.dataset.get_historical_data_sum(self.dataset.assets).to_csv("out.csv")
 
         if len(self.dataset.assets) == 0:
-            log.error("Not a single valid data file was found in the specified directory")
+            log.error(
+                "Not a single valid data file was found in the specified directory"
+            )
             exit(1)
 
         log.info("Generating report")
@@ -36,7 +38,13 @@ class Main:
         self.report.write_to_file("report.html")
         log.info("Completed successfully")
 
-        # TODO: return an error code if error/warning was received
+        if self.settings.errorcode_on_error and (log.get().error_count > 0):
+            exit(1)
+
+        if self.settings.errorcode_on_warning and (log.get().warning_count > 0):
+            exit(2)
+
+        exit(0)
 
     def _parse_arguments(self):
         parser = argparse.ArgumentParser()
