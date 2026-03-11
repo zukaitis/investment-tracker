@@ -95,7 +95,8 @@ class _Path(_Setting):
 
 class Settings:
     input_dir = _Path(
-        default=f"{os.path.dirname(os.path.realpath(__file__))}{os.path.sep}..{os.path.sep}input_data",
+        # Repo root is the default directory for input files
+        default=f"{os.path.dirname(os.path.realpath(__file__))}{os.path.sep}..",
         description="Directory, containing input files",
     )
     owner = _Name(

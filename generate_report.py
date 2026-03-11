@@ -36,6 +36,8 @@ class Main:
         self.report.write_to_file("report.html")
         log.info("Completed successfully")
 
+        # TODO: return an error code if error/warning was received
+
     def _parse_arguments(self):
         parser = argparse.ArgumentParser()
         for s in self.settings:  # all settings are possible arguments
