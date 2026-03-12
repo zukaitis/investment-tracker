@@ -24,7 +24,8 @@ jobs:
       - name: Set input file directory
         id: set_input_dir
         run: |
-          if [ -f "*.yaml" ]; then
+          count=`ls -1 *.yaml 2>/dev/null | wc -l`
+          if [ $count != 0 ]; then
             echo "input_dir=." >> $GITHUB_OUTPUT
           else
             echo "input_dir=./examples" >> $GITHUB_OUTPUT
