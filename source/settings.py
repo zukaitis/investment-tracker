@@ -4,6 +4,7 @@ import logging
 import pandas as pd
 import pytz
 import yfinance as yf
+import os
 
 from source import log
 
@@ -11,6 +12,7 @@ from source import log
 class _Setting:
     def __init__(self, default, description: str, allowed: list = None):
         self._value = default
+        self.default = default
         self.allowed = allowed
         self.description = description
 
@@ -69,6 +71,12 @@ class _Float(_Setting):
         return True
 
 
+class _Bool(_Setting):
+    def _is_allowed(self, value) -> bool:
+        bool(value)
+        return True
+
+
 class _Name(_Setting):
     @_Setting.value.setter
     def value(self, value: str):
@@ -76,7 +84,6 @@ class _Name(_Setting):
 
 
 class _LogLevel(_Setting):
-
     def __init__(self):
         self._value = logging.WARNING  # default
         self.allowed = self._level_map.keys
@@ -87,7 +94,17 @@ class _LogLevel(_Setting):
         self._value = _level_map[value]
 
 
+class _Path(_Setting):
+    def _is_allowed(self, value) -> bool:
+        return os.path.isdir(value)
+
+
 class Settings:
+    input_dir = _Path(
+        # Repo root is the default directory for input files
+        default=f"{os.path.dirname(os.path.realpath(__file__))}{os.path.sep}..",
+        description="Directory, containing input files",
+    )
     owner = _Name(
         default="Your",
         description="Name of the portfolio owner, which will be displayed in the title",
@@ -128,10 +145,17 @@ class Settings:
         default=datetime.datetime.now().astimezone().tzname(),
         description="Time zone, used in the report",
     )
-    group_by_account = _Setting(
+    group_by_account = _Bool(
         default=True,
         description="Selects whether assets should be grouped by their account",
-        allowed=[True, False],
+    )
+    errorcode_on_warning = _Bool(
+        default=True,
+        description="Selects whether script should return an errorcode when warnings were thrown",
+    )
+    errorcode_on_error = _Bool(
+        default=True,
+        description="Selects whether script should return an errorcode when errors were thrown",
     )
 
     def __init__(self):
@@ -168,3 +192,6 @@ class Settings:
 
     def get_allowed(self, name: str):
         return super().__getattribute__(name).allowed
+
+    def get_default(self, name: str):
+        return super().__getattribute__(name).default

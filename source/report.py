@@ -2,6 +2,7 @@ import datetime
 import logging
 import numpy as np
 import pandas as pd
+import os
 
 from source import dataset
 from source import dataset_identification as id
@@ -61,8 +62,8 @@ class Report:
         )
         self._report.append(
             html.Button(
-                image_initial="calendar_day.svg",
-                image_alternate="calendar_month.svg",
+                image_initial=f"{os.path.dirname(os.path.realpath(__file__))}{os.path.sep}..{os.path.sep}calendar_day.svg",
+                image_alternate=f"{os.path.dirname(os.path.realpath(__file__))}{os.path.sep}..{os.path.sep}calendar_month.svg",
                 identifier="value_change_button",
             )
         )

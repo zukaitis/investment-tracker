@@ -1,5 +1,5 @@
 ---
-name: Generate Report
+name: Generate report
 on:
   schedule:
     - cron: '00 9 * * *'  # generate report everyday at 9:00 UTC
@@ -8,41 +8,55 @@ on:
 
 jobs:
   generate-report:
-    name: Generate Report
+    name: Generate report
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v1
-      - name: Install Python packages
-        run: pip3 install -r requirements.txt
-      - name: Generate Report
-        run: ./generate_report.py
-      - name: Get Date
+        uses: actions/checkout@v5
+      - name: Checkout Upstream Repo
+        uses: actions/checkout@v5
+        with:
+          repository: zukaitis/investment-tracker
+          ref: release
+          path: upstream
+      - name: Install python packages
+        run: pip3 install -r ./upstream/requirements.txt
+      - name: Set input file directory
+        id: set_input_dir
+        run: |
+          if [ -f "*.yaml" ]; then
+            echo "input_dir=." >> $GITHUB_OUTPUT
+          else
+            echo "input_dir=./examples" >> $GITHUB_OUTPUT
+          fi
+      - name: Generate report
+        run: ./upstream/generate_report.py --input_dir ${{ steps.set_input_dir.outputs.input_dir }}
+      - name: Get date
         id: get_date
-        run: echo "::set-output name=date::$(date -I)" && echo "::set-output name=datetime::$(date '+%F %T')" && echo "::set-output name=tag::$(date '+%FT%H%M%S')"
+        run: echo "date=$(date -I)" >> $GITHUB_OUTPUT
+      - name: Get datetime
+        id: get_datetime
+        run: echo "datetime=$(date '+%F %T')" >> $GITHUB_OUTPUT
+      - name: Get tag
+        id: get_tag
+        run: echo "tag=$(date '+%FT%H%M%S')" >> $GITHUB_OUTPUT
+      - name: Get report filename
+        id: get_report_filename
+        run: echo "filename=Report_${{ steps.get_date.outputs.date }}.html" >> $GITHUB_OUTPUT
+      - name: Rename report
+        run: mv ./report.html ${{ steps.get_report_filename.outputs.filename }}
       - name: Delete older releases
-        uses: dev-drprasad/delete-older-releases@v0.1.0
+        uses: dev-drprasad/delete-older-releases@v0.3.4
         with:
             keep_latest: 6  # specify how many old releases you want to keep here
         env:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Create Release
+      - name: Create release
         id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.get_date.outputs.tag }}
-          release_name: Report ${{ steps.get_date.outputs.datetime }}
+          tag_name: ${{ steps.get_tag.outputs.tag }}
+          name: Report ${{ steps.get_datetime.outputs.datetime }}
           draft: false
           prerelease: false
-      - name: Upload Release Asset
-        id: upload-release-asset 
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./report.html
-          asset_name: Report_${{ steps.get_date.outputs.date }}.html
-          asset_content_type: text/html
+          files: ${{ steps.get_report_filename.outputs.filename }}

@@ -1,0 +1,8 @@
+---
+owner: Example
+currency: EUR
+locale: en_US
+theme: auto
+timezone: Europe/Madrid
+log_level: "info"
+group_by_account: True

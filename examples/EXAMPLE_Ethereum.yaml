@@ -1,0 +1,9 @@
+---
+name: Ethereum
+symbol: ETH-USD
+group: Cryptocurrency
+account: Some crypto exchange site
+display_price: True
+data:
+  - { date: 2017-12, investment: +45, amount_bought: 0.1}
+  - { date: 2017-11, investment: +30, amount_bought: 0.1}

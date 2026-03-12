@@ -28,7 +28,10 @@ class Dataset:
     @property
     def assets(self) -> pd.DataFrame:
         if not self._attribute_data_calculated:
-            self._calculate_attribute_data()
+            try:
+                self._calculate_attribute_data()
+            except ValueError:  # except is thrown, if _assets is empty
+                return self._assets  # return empty, but formatted dataframe
             self._attribute_data_calculated = True
         return self._assets
 
