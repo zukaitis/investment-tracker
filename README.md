@@ -2,7 +2,7 @@
 
 # Generate a daily report about your financial portfolio by using Github Actions
 
-Project uses [yfinance](https://github.com/ranaroussi/yfinance) to acquire market data and [plotly](https://plotly.com/python/) to display graphs. Daily example reports can be found under [Releases](https://github.com/zukaitis/investment-tracker/releases) 
+Project uses [yfinance](https://github.com/ranaroussi/yfinance) to acquire market data and [Plotly](https://plotly.com/python/) to display graphs. Daily example reports can be found under [Releases](https://github.com/zukaitis/investment-tracker/releases) 
 
 ## Usage
 
