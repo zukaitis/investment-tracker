@@ -1,0 +1,31 @@
+---
+# Name of the asset - required
+name: Buy-Sell Multiple Times
+# Symbol of the asset, which is used for automatic data fetching. Find out the symbol of your asset by searching for it on https://finance.yahoo.com/
+symbol: TSLA
+# Account (bank for example), where the asset is kept. Optional
+account: Some Other Bank
+# Type of asset (e.g. Stock, Crypto, ETFs). Optional, but recommended
+group: Stocks
+# Information about the asset. If not specified, asset info will be fetched automatically
+info: >
+  This example portrays same asset, which is bought/sold numerous times during the years.
+  It's created to display, how splitting time data into periods work. Notice, that current stats
+  are displayed for the last period only, but not the whole history of the asset.
+# Historical (purchase/selling) data of your asset. Required, obviously
+data:
+  # Date has to be specified for every entry. No two lines should should contain the same date
+  - { date: 2017-07-19, investment: +350, amount: 15 }
+  # All other parameters are optional. Amount is TOTAL amount you have of that asset at the specified date
+  - { date: 2018-01-09, investment: -345, amount: 0 }
+  # amount_bought is how much of the asset you've bought/sold on the specified day. Choose whichever is more convenient for the specific entry 
+  - { date: 2019-06-07, investment: +416, amount_bought: 34 }
+  # return shall only be specified if dividend data is not provided in finance.yahoo.com. It is a full sum of money you've received on specified date
+  - { date: 2019-10-22, return: 10 }
+  # return_tax should be specified, if dividend data is provided, but tax is deduced upon receiving it. It's specified as fraction - 10% in the example case
+  - { date: 2019-10-23, return_tax: 0.10 }
+  - { date: 2019-11-29, investment: -716, amount: 0 }
+  - { date: 2020-08-28, investment: +444, amount: 2.7 }
+  - { date: 2020-11-06, investment: -376, amount: 0 }
+  - { date: 2021-02-16, investment: +200, amount: 0.74 }
+
