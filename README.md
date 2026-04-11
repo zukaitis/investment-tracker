@@ -1,4 +1,4 @@
-[![Static Badge](https://img.shields.io/badge/version-1.1.0-green)](https://github.com/zukaitis/investment-tracker/releases/tag/1.1.0)
+[![Static Badge](https://img.shields.io/badge/version-1.2.0-green)](https://github.com/zukaitis/investment-tracker/releases/tag/1.2.0)
 
 # Generate a daily report about your financial portfolio by using Github Actions
 
