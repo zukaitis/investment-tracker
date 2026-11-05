@@ -24,8 +24,17 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.12'
+      - name: Set requirements file
+        id: set_requirements_file
+        run: |
+          count=`ls -1 requirements.txt 2>/dev/null | wc -l`
+          if [ $count != 0 ]; then
+            echo "requirements=./requirements.txt" >> $GITHUB_OUTPUT
+          else
+            echo "requirements=./upstream/requirements.txt" >> $GITHUB_OUTPUT
+          fi
       - name: Install python packages
-        run: python -m pip install -r ./upstream/requirements.txt
+        run: python -m pip install -r ${{ steps.set_requirements_file.outputs.requirements }}
       - name: Set input file directory
         id: set_input_dir
         run: |
