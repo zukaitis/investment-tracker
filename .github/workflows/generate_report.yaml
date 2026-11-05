@@ -20,8 +20,12 @@ jobs:
           repository: zukaitis/investment-tracker
           ref: release
           path: upstream
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
       - name: Install python packages
-        run: pip3 install -r ./upstream/requirements.txt
+        run: python -m pip install -r ./upstream/requirements.txt
       - name: Set input file directory
         id: set_input_dir
         run: |
@@ -32,7 +36,7 @@ jobs:
             echo "input_dir=./examples" >> $GITHUB_OUTPUT
           fi
       - name: Generate report
-        run: ./upstream/generate_report.py --input_dir ${{ steps.set_input_dir.outputs.input_dir }}
+        run: python -X faulthandler ./upstream/generate_report.py --input_dir ${{ steps.set_input_dir.outputs.input_dir }}
       - name: Get date
         id: get_date
         run: echo "date=$(date -I)" >> $GITHUB_OUTPUT
