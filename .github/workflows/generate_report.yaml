@@ -32,11 +32,13 @@ jobs:
           count=`ls -1 *.yaml 2>/dev/null | wc -l`
           if [ $count != 0 ]; then
             echo "input_dir=." >> $GITHUB_OUTPUT
+            echo "executable=./upstream/generate_report.py" >> $GITHUB_OUTPUT
           else
             echo "input_dir=./examples" >> $GITHUB_OUTPUT
+            echo "executable=./generate_report.py" >> $GITHUB_OUTPUT
           fi
       - name: Generate report
-        run: python -X faulthandler ./upstream/generate_report.py --input_dir ${{ steps.set_input_dir.outputs.input_dir }}
+        run: python -X faulthandler ${{ steps.set_input_dir.outputs.executable }} --input_dir ${{ steps.set_input_dir.outputs.input_dir }}
       - name: Get date
         id: get_date
         run: echo "date=$(date -I)" >> $GITHUB_OUTPUT
