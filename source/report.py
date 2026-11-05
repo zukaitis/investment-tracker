@@ -51,7 +51,7 @@ class Report:
         self._append_footer()
 
     def write_to_file(self, filename: str):
-        with open(filename, "w") as f:
+        with open(filename, "w", encoding="utf-8") as f:
             print(self._report, file=f)
 
     def _append_header(self):
