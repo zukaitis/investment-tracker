@@ -213,7 +213,7 @@ class Graphing:
         sunburst.update_traces(insidetextorientation="radial")
         sunburst.update_layout(margin=dict(l=10, r=10, t=10, b=10))
 
-        return sunburst.to_html(full_html=False, include_plotlyjs=True)
+        return sunburst.to_html(full_html=False, include_plotlyjs=False)
 
     _cyan = px.colors.qualitative.Plotly[5]
 
@@ -321,7 +321,7 @@ class Graphing:
             fig, self._dataset.latest_date - data.index[0]
         )
 
-        return fig.to_html(full_html=False, include_plotlyjs=True)
+        return fig.to_html(full_html=False, include_plotlyjs=False)
 
     def get_yearly_asset_data_plot(self, input_data: pd.DataFrame) -> go.Figure:
         class Column(enum.Enum):

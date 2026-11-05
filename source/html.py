@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import typing
 from pathlib import Path
 import os
+import plotly.offline
 
 _positive_color = "green"
 _negative_color = "red"
@@ -22,6 +23,18 @@ _button_css = """{
     user-select: none;
     opacity: 0.2;
 }"""
+
+# Plots inside hidden tabs/accordions (display: none) get rendered with no width available,
+# so resize all visible plots whenever a tab or accordion input is toggled
+_resize_plots_script = """
+document.addEventListener("change", function () {
+    document.querySelectorAll(".js-plotly-plot").forEach(function (plot) {
+        if (plot.offsetParent !== null) {
+            Plotly.Plots.resize(plot);
+        }
+    });
+});
+"""
 
 
 class _HtmlObject:
@@ -54,12 +67,17 @@ class Document:
             f"{os.path.dirname(os.path.realpath(__file__))}{os.path.sep}..{os.path.sep}style.css"
         )
         self._document.head += raw("</style>")
+        # plotly.js is included once here, figures are exported without it
+        self._document.head += raw(
+            f'<script type="text/javascript">{plotly.offline.get_plotlyjs()}</script>'
+        )
+        self._document.head += raw(f'<script type="text/javascript">{_resize_plots_script}</script>')
 
     def append(self, obj: typing.Union[_HtmlObject, str]):
         self._document += raw(str(obj))
 
     def _append_file_to_head(self, file: str):
-        self._document.head += raw(Path(file).read_text())
+        self._document.head += raw(Path(file).read_text(encoding="utf-8"))
 
     def _append_css_variables_to_head(self, variables: str):
         self._document.head += raw(":root {")
@@ -249,10 +267,10 @@ class Button(_HtmlObject):
             f'<input type="checkbox" id="{identifier}" name="{identifier}" checked>'
         )
         self._raw += f'<label for="{identifier}" class="{identifier}_unchecked">'
-        self._raw += Path(image_initial).read_text()
+        self._raw += Path(image_initial).read_text(encoding="utf-8")
         self._raw += f"</label>"
         self._raw += f'<label for="{identifier}" class="{identifier}_checked">'
-        self._raw += Path(image_alternate).read_text()
+        self._raw += Path(image_alternate).read_text(encoding="utf-8")
         self._raw += f"</label>"
 
 

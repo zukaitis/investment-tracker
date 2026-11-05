@@ -51,7 +51,7 @@ class Report:
         self._append_footer()
 
     def write_to_file(self, filename: str):
-        with open(filename, "w") as f:
+        with open(filename, "w", encoding="utf-8") as f:
             print(self._report, file=f)
 
     def _append_header(self):
@@ -423,10 +423,10 @@ class Report:
         if len(historical_data) > 1:
             yearly_figure = self._graphing.get_yearly_asset_data_plot(
                 historical_data
-            ).to_html(full_html=False, include_plotlyjs=True)
+            ).to_html(full_html=False, include_plotlyjs=False)
             historical_figure = self._graphing.get_historical_asset_data_plot(
                 historical_data
-            ).to_html(full_html=False, include_plotlyjs=True)
+            ).to_html(full_html=False, include_plotlyjs=False)
             figures = html.Columns(
                 [
                     html.Column(width=30, content=yearly_figure),

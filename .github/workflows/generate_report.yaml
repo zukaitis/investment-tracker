@@ -20,19 +20,34 @@ jobs:
           repository: zukaitis/investment-tracker
           ref: release
           path: upstream
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Set requirements file
+        id: set_requirements_file
+        run: |
+          count=`ls -1 requirements.txt 2>/dev/null | wc -l`
+          if [ $count != 0 ]; then
+            echo "requirements=./requirements.txt" >> $GITHUB_OUTPUT
+          else
+            echo "requirements=./upstream/requirements.txt" >> $GITHUB_OUTPUT
+          fi
       - name: Install python packages
-        run: pip3 install -r ./upstream/requirements.txt
+        run: python -m pip install -r ${{ steps.set_requirements_file.outputs.requirements }}
       - name: Set input file directory
         id: set_input_dir
         run: |
           count=`ls -1 *.yaml 2>/dev/null | wc -l`
           if [ $count != 0 ]; then
             echo "input_dir=." >> $GITHUB_OUTPUT
+            echo "executable=./upstream/generate_report.py" >> $GITHUB_OUTPUT
           else
             echo "input_dir=./examples" >> $GITHUB_OUTPUT
+            echo "executable=./generate_report.py" >> $GITHUB_OUTPUT
           fi
       - name: Generate report
-        run: ./upstream/generate_report.py --input_dir ${{ steps.set_input_dir.outputs.input_dir }}
+        run: python -X faulthandler ${{ steps.set_input_dir.outputs.executable }} --input_dir ${{ steps.set_input_dir.outputs.input_dir }}
       - name: Get date
         id: get_date
         run: echo "date=$(date -I)" >> $GITHUB_OUTPUT

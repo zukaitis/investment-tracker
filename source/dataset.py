@@ -216,9 +216,12 @@ class Dataset:
         self._assets.fillna({id.Attribute.GROUP: unassigned}, inplace=True)
         self._assets.fillna({id.Attribute.ACCOUNT: unassigned}, inplace=True)
         self._assets.fillna({id.Attribute.SYMBOL: unassigned}, inplace=True)
-        self._assets.fillna(
-            {id.Attribute.YFINANCE_FETCH_SUCCESSFUL: False}, inplace=True
-        )
+        # column only ever holds True or NaN, so convert explicitly to avoid object-dtype downcasting
+        fetch_successful = id.Attribute.YFINANCE_FETCH_SUCCESSFUL
+        if fetch_successful in self._assets.columns:
+            self._assets[fetch_successful] = self._assets[fetch_successful].eq(True)
+        else:
+            self._assets[fetch_successful] = False
         self._reassign_colors()
 
     def _reassign_colors(self):

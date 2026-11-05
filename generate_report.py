@@ -69,7 +69,7 @@ class Main:
         settings_found = SettingsFound.NO
         for entry in os.scandir(self.settings.input_dir):
             if entry.is_file() and entry.path.endswith((".yaml", ".yml")):
-                with open(entry, "r") as entry_file:
+                with open(entry, "r", encoding="utf-8") as entry_file:
                     input = yaml.safe_load(entry_file)
                 # check if there are general settings in file
                 if ("data" not in input) and (any([s in input for s in self.settings])):
@@ -96,7 +96,7 @@ class Main:
     def _read_asset_data(self):
         for entry in os.scandir(self.settings.input_dir):
             if entry.is_file() and entry.path.endswith((".yaml", ".yml")):
-                with open(entry, "r") as entry_file:
+                with open(entry, "r", encoding="utf-8") as entry_file:
                     datadict = yaml.safe_load(entry_file)
                 # check that there are no general settings in file
                 if "data" in datadict:
