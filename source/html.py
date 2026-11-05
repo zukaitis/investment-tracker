@@ -59,7 +59,7 @@ class Document:
         self._document += raw(str(obj))
 
     def _append_file_to_head(self, file: str):
-        self._document.head += raw(Path(file).read_text())
+        self._document.head += raw(Path(file).read_text(encoding="utf-8"))
 
     def _append_css_variables_to_head(self, variables: str):
         self._document.head += raw(":root {")
@@ -249,10 +249,10 @@ class Button(_HtmlObject):
             f'<input type="checkbox" id="{identifier}" name="{identifier}" checked>'
         )
         self._raw += f'<label for="{identifier}" class="{identifier}_unchecked">'
-        self._raw += Path(image_initial).read_text()
+        self._raw += Path(image_initial).read_text(encoding="utf-8")
         self._raw += f"</label>"
         self._raw += f'<label for="{identifier}" class="{identifier}_checked">'
-        self._raw += Path(image_alternate).read_text()
+        self._raw += Path(image_alternate).read_text(encoding="utf-8")
         self._raw += f"</label>"
 
 
